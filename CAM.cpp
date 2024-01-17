@@ -7,7 +7,7 @@ using namespace arma;
 int main() {
 
       // Esempio di dati: 5 persone e 3 dati per persona, per ogni dato una matrice 2x2 (non vettore?)
-      arma::field<Mat> field_example(5, 3);  // Creerà un campo 3x3 di matrici vuote
+      //arma::field<Mat> field_example(5, 3);  // Creerà un campo 3x3 di matrici vuote
       for (arma::uword i = 0; i < field_example.n_elem; i++) {
       field_example(i) = arma::randu(2, 2);  // Matrici 2x2 con valori casuali perche matrice e non vettore?
       }

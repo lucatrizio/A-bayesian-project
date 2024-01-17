@@ -2,10 +2,83 @@
 #include "vector"
 #include <armadillo>
 #include <random>
+#include <iostream>
+#include <cstdlib>
 
 using namespace std;
 using namespace arma;
 
+
+
+class Data {
+private:
+    float***data;
+    size_t n, //number of people
+    *observations, //number of observations for each person
+    v; //number of observed parameters for each observation
+
+public:
+    // Constructor
+    Data(size_t n, size_t*observations, size_t v) : n(n), observations(observations), v(v){
+               
+        data=(float***)malloc(sizeof(float**)*n);
+
+        for(size_t i=0; i<n; i++)
+        {
+            data[i]=(float**)malloc(sizeof(float*)*observations[i]);
+
+            for(size_t j=0; j<observations[i]; j++)
+            {
+                data[i][j]=(float*)malloc(sizeof(float)*v);
+            }
+        }
+
+        if (data == nullptr) {
+            std::cerr << "Memory allocation failed!" << std::endl;
+        }
+    }
+
+    // Destructor
+    ~Data()
+    {
+        for (size_t i = 0; i < n; i++)
+        {
+
+            for (size_t j = 0; j < observations[i]; j++)
+            {
+
+                free(data[i][j]);
+            }
+            free(data[i]);
+        }
+        free(data);
+    }
+
+    void set(size_t x, size_t y, size_t z, float n){
+        data[x][y][z]=n;
+    }
+
+    float get(size_t x, size_t y, size_t z){
+        return data[x][y][z];
+    }
+
+    void print()
+    {
+        for (size_t i = 0; i < n; i++)
+        {
+            for (size_t j = 0; j < observations[i]; j++)
+            {
+                std::cout << "(";
+                for (size_t k = 0; k < v; k++)
+                {
+                    std::cout << data[i][j][k] << " ";
+                }
+                std::cout << ") ";
+            }
+            std::cout << std::endl;
+        }
+    }
+};
 
 // TODO: Getter and Setter, spostare le variabili da public a private e cambiare di conseguenza il codice con i vari.get() e .set()
 
