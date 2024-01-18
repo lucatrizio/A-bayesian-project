@@ -3,7 +3,6 @@
 #include <armadillo>
 #include <random>
 #include <iostream>
-#include <cstdlib>
 
 using namespace std;
 using namespace arma;
@@ -19,39 +18,35 @@ private:
 
 public:
     // Constructor
-    Data(size_t n, size_t*observations, size_t v) : n(n), observations(observations), v(v){
-               
-        data=(float***)malloc(sizeof(float**)*n);
+    Data(size_t n, size_t *observations, size_t v) : n(n), observations(observations), v(v)
+    {
 
-        for(size_t i=0; i<n; i++)
+        data = new float **[n];
+
+        for (size_t i = 0; i < n; ++i)
         {
-            data[i]=(float**)malloc(sizeof(float*)*observations[i]);
+            data[i] = new float *[observations[i]];
 
-            for(size_t j=0; j<observations[i]; j++)
+            for (size_t j = 0; j < observations[i]; ++j)
             {
-                data[i][j]=(float*)malloc(sizeof(float)*v);
+                data[i][j] = new float[v];
             }
-        }
-
-        if (data == nullptr) {
-            std::cerr << "Memory allocation failed!" << std::endl;
         }
     }
 
     // Destructor
     ~Data()
     {
-        for (size_t i = 0; i < n; i++)
+        for (size_t i = 0; i < n; ++i)
         {
-
-            for (size_t j = 0; j < observations[i]; j++)
+            for (size_t j = 0; j < observations[i]; ++j)
             {
-
-                free(data[i][j]);
+                delete[] data[i][j];
             }
-            free(data[i]);
+            delete[] data[i];
         }
-        free(data);
+
+        delete[] data;
     }
 
     void set(size_t x, size_t y, size_t z, float n){
@@ -77,6 +72,14 @@ public:
             }
             std::cout << std::endl;
         }
+    }
+
+    size_t getpeople(){
+        return n;
+    }
+
+    size_t get_atoms(size_t i){
+        return observations[i];
     }
 };
 
@@ -138,7 +141,7 @@ private:
 
 
 public:
-    field<mat> data; //input
+    //Data data; //input
     Dimensions dim; //input
     vec pi; // (K x 1) pesi per scegliere DC
     vec alpha; // (K x 1) K:= numero di DC (passato in input)
@@ -150,12 +153,12 @@ public:
     // Costruttore 
 
 
-    Chain(const Dimensions& input_dim, const vec& input_alpha, const vec& input_beta, const arma::field<mat>& input_data) {
+    Chain(const Dimensions& input_dim, const vec& input_alpha, const vec& input_beta, Data& input_data) {
 
         dim = input_dim;
         alpha = input_alpha;
         beta = input_beta;
-        data = input_data;
+        //data = input_data;
 
         // Generazione dei pesi pi e w
         pi = generateDirichlet(alpha); // genera i pesi per DC dalla Dirichlet
