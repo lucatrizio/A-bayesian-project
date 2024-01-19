@@ -8,6 +8,106 @@ using namespace std;
 using namespace arma;
 
 
+class Theta{
+private:
+    struct Parameters
+    {
+        float*mean;
+        float**covariance;
+    };
+
+    Parameters*theta; //vector of parameters(mean and coavariance)
+    size_t size_L, size_v; //Number of L observational clusters (normal distributions each with a mean and a covariance)
+    
+public:
+    // Constructor
+    Theta(size_t L, size_t v) : size_L(L), size_v(v)
+    {
+        theta = new Parameters[L];
+
+        for (size_t i = 0; i < L; i++)
+        {
+            theta[i].mean = new float[v];
+            theta[i].covariance = new float *[v];
+
+            for (size_t j = 0; j < count; j++)
+            {
+                theta[i].covariance[j] = new float[v];
+            }
+            
+        }
+        
+    }
+
+    // Destructor
+    ~Theta()
+    {
+        for (size_t i = 0; i < size_L; ++i)
+        {
+            delete[] theta[i].mean;
+
+            for (size_t j = 0; j < size_v; j++)
+            {
+                delete[] theta[i].covariance[j];
+            }
+            delete[] theta[i].covariance;
+        }
+
+        delete[] theta;
+    }
+
+    void print(){
+        for (size_t i = 0; i < size_L; i++)
+        {
+            std::cout << "mean" << i << ":(";
+            for (size_t j = 0; j < size_v; j++)
+            {
+                std::cout << theta[i].mean[j] << ",";
+            }
+            std::cout << ")  covariance" << i << ":(";
+
+            for (size_t j = 0; j < size_v; j++)
+            {
+                std::cout << "[";
+                for (size_t k = 0; k < size_v; k++)
+                {
+                    std::cout << theta[i].covariance[j][k] << ",";
+                }
+                std::cout << "] ";
+                
+            }
+
+            std::cout << ")";
+            std::cout << std::endl;
+            
+        } 
+    }
+
+    void set(size_t s, float *mean, float **covariance)
+    {
+
+        for (size_t i = 0; i < count; i++)
+        {
+            theta[s].mean[i] = mean[i];
+
+            for (size_t j = 0; j < count; j++)
+            {
+                theta[s].coavariance[i][j] = covariance[i][j];
+            }
+        }
+    }
+
+    float *getMean(size_t i)
+    {
+        return theta[i].mean;
+    }
+
+    float **getCovariate(size_t i)
+    {
+        return theta[i].covariance;
+    }
+
+}
 
 class Data {
 private:
@@ -78,10 +178,20 @@ public:
         return n;
     }
 
+    //returns the number of observations for a certain person i
     size_t get_atoms(size_t i){
         return observations[i];
     }
 };
+
+arma::vec toArma(float*array, size_t arraySize){
+    return armaVector(array, arraySize, false);
+}
+
+void toStd(arma::vec vector, float **array, size_t*size){
+    *array=vector.memptr();
+    *size=vector.size();
+}
 
 // TODO: Getter and Setter, spostare le variabili da public a private e cambiare di conseguenza il codice con i vari.get() e .set()
 
