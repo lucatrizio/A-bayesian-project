@@ -87,17 +87,6 @@ public:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
 struct Dimensions{
     int J; //n of persons
     int K; //n of DC
@@ -125,64 +114,49 @@ vec generateDirichlet(const vec& alpha) {
 
 
 class Chain{
-    // ANDREBBERO MESSE TUTTE LE VARIABILI NEL PRIOR E CREATI GETTERS E SETTERS
 
-    /*
+
 private:
-    field<mat> data;
-    Dimensions dim;
+    Data data; //input
+    Dimensions dim; //input
+    vec alpha; // (K x 1) K:= numero di DC (passato in input)
     vec pi; // (K x 1) pesi per scegliere DC
-    vec alpha; // (K x 1) K:= numero di DC
+    vec beta; // (L x 1) L := numero di OC (passato in input)
     mat w; // (L x K) scelto K, pesi per scegliere OC
-    vec beta; // (L x 1) L := numero di OC
-    Col<int> S; // (J x 1) assegna un DC ad ogni persona (J persone)
+    arma::Col<int> S; // (J x 1) assegna un DC ad ogni persona (J persone)
     Mat<int> M; // (J x max(n_j)) assegna per ogni persona un OC ad ogni atomo di quella persona (J persone e n_j atomo per persona j)
-    */
+    theta;
 
 
 public:
-    //Data data; //input
-    Dimensions dim; //input
-    vec pi; // (K x 1) pesi per scegliere DC
-    vec alpha; // (K x 1) K:= numero di DC (passato in input)
-    mat w; // (L x K) scelto K, pesi per scegliere OC
-    vec beta; // (L x 1) L := numero di OC (passato in input)
-    arma::Col<int> S; // (J x 1) assegna un DC ad ogni persona (J persone)
-    Mat<int> M; // (J x max(n_j)) assegna per ogni persona un OC ad ogni atomo di quella persona (J persone e n_j atomo per persona j)
 
     // Costruttore 
-
-
-    Chain(const Dimensions& input_dim, const vec& input_alpha, const vec& input_beta, Data& input_data) {
-
-        dim = input_dim;
-        alpha = input_alpha;
-        beta = input_beta;
-        //data = input_data;
+    Chain(const Dimensions& input_dim, const vec& input_alpha, const vec& input_beta, Data& input_data) : dim(input_dim), alpha(input_alpha), beta(input_beta), data(input_data) {
 
         // Generazione dei pesi pi e w
-        pi = generateDirichlet(alpha); // genera i pesi per DC dalla Dirichlet
-        for (int k = 0; k < dim.K; k++) {
-            vec w_k = generateDirichlet(beta); //genera un vettore dalla dirichlet per ogni k
-            w = join_rows(w, w_k); // costruisce la matrice dei pesi aggiungendo ogni colonna
-        }
+        pi = draw_pi(alpha); // genera i pesi per DC dalla Dirichlet
+        w = draw_W(beta, dim.K);
 
         // Generazione delle variabili categoriche S e M
-        std::default_random_engine generatore_random;
+        S = draw_S(pi, dim.J);
+        M = draw_M(w, S, dim.N, dim.J);
 
-        discrete_distribution<int> Cat(pi.begin(), pi.end()); 
+        // Generazione dei parametri theta
+        theta = draw_theta();
+    }
 
-        S.set_size(dim.J);
-        M.set_size(dim.J, dim.N);
-        
-        for (int j = 0; j < dim.J; j++) {
-            S(j) = Cat(generatore_random); // genera S (vettore lungo J persone) con ogni elemento preso dalla categorica con pesi pi
-            discrete_distribution<int> Cat_w(w.col(S(j)).begin(), w.col(S(j)).end()); //avendo deciso S per la persona j, costruisco la distribuzione categorica con i pesi associati a w_S(j)
-            for (int i = 0; i < dim.N; i++) {
-                M(j,i) = Cat_w(generatore_random); // genera M(matrice J x N) per ogni persona (j), genera N valori da categoriche seguendo la distribuzione Cat_w
-            }
-        }
-        
+
+    void chain_step(void) {
+        alpha = update_alpha(alpha, S, dim.K);
+        beta = update_beta(beta, M, dim.L);
+
+        pi = draw_pi(alpha);
+        pi = update_pi(pi, w, dim.K, dim.L);
+
+        w = draw_W(beta, dim.K);
+        w = update_W();
+
+
     }
 
 
@@ -193,7 +167,73 @@ public:
         cout << "S:\n" << S << endl;
         cout << "M:\n" << M << endl;
     }
+};
 
 
+vec draw_pi(vec& alpha) {
+    return generateDirichlet(alpha);
+};
+
+mat draw_W(vec& beta, int& K) {
+    mat w;
+    for (int k = 0; k < K; k++) {
+            vec w_k = generateDirichlet(beta); //genera un vettore dalla dirichlet per ogni k
+            w = arma::join_rows(w, w_k); // costruisce la matrice dei pesi aggiungendo ogni colonna
+        }
+    return w;
+};
+
+arma::Col<int> draw_S(vec& pi, int J) {
+    arma::Col<int> S;
+    S.set_size(J);
+    std::default_random_engine generatore_random;
+    discrete_distribution<int> Cat(pi.begin(), pi.end()); 
+    for (int j = 0; j < J; j++) {
+        S(j) = Cat(generatore_random);
+    }
+    return S;
+};
+
+arma::Mat<int> draw_M(mat& w, arma::Col<int>& S, int& N, int& J)  {
+    arma::Mat<int> M;
+    M.set_size(J, N);
+    std::default_random_engine generatore_random;
+    for (int j = 0; j < J; ++j) {
+        discrete_distribution<int> Cat_w(w.col(S(j)).begin(), w.col(S(j)).end());
+        for (int i = 0; i < N; i++) {
+            M(j,i) = Cat_w(generatore_random); // genera M(matrice J x N) per ogni persona (j), genera N valori da categoriche seguendo la distribuzione Cat_w
+        }
+    }
+    return M;
+};
+
+
+vec update_alpha(vec& alpha, arma::Col<int>& S, int& K) {
+    for (int k = 0; k < K; ++k) {
+        alpha(k) = alpha(k) + arma::accu(S == k);
+    }
+    return alpha;
+};
+
+vec update_beta(vec& beta, arma::Mat<int>& M, int& L) {
+    for (int l = 0; l < L; ++l) {
+        beta(l) = beta(l) + arma::accu(M == l);
+    }
+};
+
+vec update_pi(vec& pi, mat& w, int& K, int& L) {
+    for (int k = 0; k < K; ++k) {
+        int prod = 1;
+        for (int l = 0; l < L; ++l) {
+            prod *= w(l,k);
+        }
+        pi(k) = pi(k) * prod;
+    }
+    return pi;
+};
+
+mat update_w() {
 
 };
+
+
