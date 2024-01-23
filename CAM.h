@@ -12,8 +12,8 @@ class Theta{
 private:
     struct Parameters
     {
-        float*mean;
-        float**covariance;
+        double*mean;
+        double**covariance;
     };
 
     Parameters*theta; //vector of parameters(mean and coavariance)
@@ -27,12 +27,12 @@ public:
 
         for (size_t i = 0; i < L; i++)
         {
-            theta[i].mean = new float[v];
-            theta[i].covariance = new float *[v];
+            theta[i].mean = new double[v];
+            theta[i].covariance = new double *[v];
 
-            for (size_t j = 0; j < count; j++)
+            for (size_t j = 0; j < v; j++)
             {
-                theta[i].covariance[j] = new float[v];
+                theta[i].covariance[j] = new double[v];
             }
             
         }
@@ -83,35 +83,40 @@ public:
         } 
     }
 
-    void set(size_t s, float *mean, float **covariance)
+    void set(size_t s, double *mean, double **covariance)
     {
 
-        for (size_t i = 0; i < count; i++)
+        for (size_t i = 0; i < size_v; i++)
         {
             theta[s].mean[i] = mean[i];
 
-            for (size_t j = 0; j < count; j++)
+            for (size_t j = 0; j < size_v; j++)
             {
-                theta[s].coavariance[i][j] = covariance[i][j];
+                theta[s].covariance[i][j] = covariance[i][j];
             }
         }
     }
 
-    float *getMean(size_t i)
+    Parameters getParametersOf(size_t i)
+    {
+        return theta[i];
+    } 
+
+    double *getMean(size_t i)
     {
         return theta[i].mean;
     }
 
-    float **getCovariate(size_t i)
+    double **getCovariate(size_t i)
     {
         return theta[i].covariance;
     }
 
-}
+};
 
 class Data {
 private:
-    float***data;
+    double***data;
     size_t n, //number of people
     *observations, //number of observations for each person
     v; //number of observed parameters for each observation
@@ -121,15 +126,15 @@ public:
     Data(size_t n, size_t *observations, size_t v) : n(n), observations(observations), v(v)
     {
 
-        data = new float **[n];
+        data = new double **[n];
 
         for (size_t i = 0; i < n; ++i)
         {
-            data[i] = new float *[observations[i]];
+            data[i] = new double *[observations[i]];
 
             for (size_t j = 0; j < observations[i]; ++j)
             {
-                data[i][j] = new float[v];
+                data[i][j] = new double[v];
             }
         }
     }
@@ -149,11 +154,11 @@ public:
         delete[] data;
     }
 
-    void set(size_t x, size_t y, size_t z, float n){
+    void set(size_t x, size_t y, size_t z, double n){
         data[x][y][z]=n;
     }
 
-    float get(size_t x, size_t y, size_t z){
+    double get(size_t x, size_t y, size_t z){
         return data[x][y][z];
     }
 
@@ -184,13 +189,19 @@ public:
     }
 };
 
-arma::vec toArma(float*array, size_t arraySize){
-    return armaVector(array, arraySize, false);
+
+//--------Technical comment--------
+//memory is self managed, armadillo doesn't allocate, delete[] array in main after use!
+arma::vec toArma(double*array, size_t arraySize){
+    return arma::vec(array, arraySize, false);
 }
 
-void toStd(arma::vec vector, float **array, size_t*size){
-    *array=vector.memptr();
+//--------Technical comment--------
+//memory managed by armadillo, kept until out of scope
+double* toStd(const arma::vec& vector, size_t*size){
     *size=vector.size();
+    return vector.memptr();
+    
 }
 
 // TODO: Getter and Setter, spostare le variabili da public a private e cambiare di conseguenza il codice con i vari.get() e .set()
