@@ -7,6 +7,18 @@
 using namespace std;
 using namespace arma;
 
+// TODO
+
+// Sparse matrix for M? rows of different size
+// Dimension struct -> N is not an integer but a vector
+// log_w instead of w? -> change draw_w to draw_log_w -> change draw_M (it will take log_w instead of w)
+// update_M to be implemented (remeber to use log likelihood)
+// draw_theta to be implemented
+// update_theta to be implemented (remember to use log likelihood)
+
+
+
+
 
 class Theta{
 private:
@@ -184,8 +196,12 @@ public:
     }
 
     //returns the number of observations for a certain person i
-    size_t get_atoms(size_t i){
+    size_t get_atom(size_t i){
         return observations[i];
+    }
+
+    size_t* get_atoms() {
+        return observations;
     }
 };
 
@@ -241,11 +257,11 @@ private:
     Data data; //input
     Dimensions dim; //input
     vec alpha; // (K x 1) K:= numero di DC (passato in input)
-    vec pi; // (K x 1) pesi per scegliere DC
+    vec log_pi; // (K x 1) pesi per scegliere DC
     vec beta; // (L x 1) L := numero di OC (passato in input)
     mat w; // (L x K) scelto K, pesi per scegliere OC
     arma::Col<int> S; // (J x 1) assegna un DC ad ogni persona (J persone)
-    Mat<int> M; // (J x max(n_j)) assegna per ogni persona un OC ad ogni atomo di quella persona (J persone e n_j atomo per persona j)
+    mat M; // (J x max(n_j)) assegna per ogni persona un OC ad ogni atomo di quella persona (J persone e n_j atomo per persona j)
     Theta theta; // (L x 1) ogni elemento di Theta è uno degli atomi comuni a tutti i DC
 
 
@@ -255,11 +271,11 @@ public:
     Chain(const Dimensions& input_dim, const vec& input_alpha, const vec& input_beta, Data& input_data) : dim(input_dim), alpha(input_alpha), beta(input_beta), data(input_data) {
 
         // Generazione dei pesi pi e w
-        pi = draw_pi(alpha); // genera i pesi per DC dalla Dirichlet
+        log_pi = draw_log_pi(alpha); // genera i pesi per DC dalla Dirichlet
         w = draw_W(beta, dim.K);
 
         // Generazione delle variabili categoriche S e M
-        S = draw_S(pi, dim.J);
+        S = draw_S(log_pi, dim.J);
         M = draw_M(w, S, dim.N, dim.J);
 
         // Generazione dei parametri theta
@@ -268,11 +284,11 @@ public:
 
 
     void chain_step(void) {
-        alpha = update_alpha(alpha, S, dim.K);
-        beta = update_beta(beta, M, dim.L);
+        alpha = update_pi(alpha, S, dim.K);
+        beta = update_omega(beta, M, dim.L);
 
-        pi = draw_pi(alpha);
-        pi = update_pi(pi, w, dim.K, dim.L);
+        log_pi = draw_log_pi(alpha);
+        log_pi = update_S(log_pi, w, dim.K, M, dim.J, data.get_atoms());
 
         w = draw_W(beta, dim.K);
         w = update_W();
@@ -283,7 +299,7 @@ public:
 
     // Stampa
     void print(void) {
-        cout << "pi:\n" << pi << endl;
+        cout << "pi:\n" << exp(log_pi) << endl;
         cout << "w:\n" << w << endl;
         cout << "S:\n" << S << endl;
         cout << "M:\n" << M << endl;
@@ -291,9 +307,11 @@ public:
 };
 
 
-vec draw_pi(vec& alpha) {
-    return generateDirichlet(alpha);
+vec draw_log_pi(vec& alpha) {
+    vec pi = generateDirichlet(alpha);
+    return arma::log(pi);
 };
+
 
 mat draw_W(vec& beta, int& K) {
     mat w;
@@ -304,7 +322,9 @@ mat draw_W(vec& beta, int& K) {
     return w;
 };
 
-arma::Col<int> draw_S(vec& pi, int J) {
+
+arma::Col<int> draw_S(arma::vec& log_pi, int J) {
+    arma::vec pi = exp(log_pi);
     arma::Col<int> S;
     S.set_size(J);
     std::default_random_engine generatore_random;
@@ -315,9 +335,10 @@ arma::Col<int> draw_S(vec& pi, int J) {
     return S;
 };
 
-arma::Mat<int> draw_M(mat& w, arma::Col<int>& S, int& N, int& J)  {
-    arma::Mat<int> M;
-    M.set_size(J, N);
+
+mat draw_M(mat& w, arma::Col<int>& S, int& N, int& J)  {
+    arma::mat M;
+    M.zeros(J, N);
     std::default_random_engine generatore_random;
     for (int j = 0; j < J; ++j) {
         discrete_distribution<int> Cat_w(w.col(S(j)).begin(), w.col(S(j)).end());
@@ -329,31 +350,38 @@ arma::Mat<int> draw_M(mat& w, arma::Col<int>& S, int& N, int& J)  {
 };
 
 
-vec update_alpha(vec& alpha, arma::Col<int>& S, int& K) {
+vec update_pi(vec& alpha, arma::Col<int>& S, int& K) {
     for (int k = 0; k < K; ++k) {
         alpha(k) = alpha(k) + arma::accu(S == k);
     }
     return alpha;
 };
 
-vec update_beta(vec& beta, arma::Mat<int>& M, int& L) {
+
+vec update_omega(vec& beta, mat M, int& L) {
     for (int l = 0; l < L; ++l) {
         beta(l) = beta(l) + arma::accu(M == l);
     }
 };
 
-vec update_pi(vec& pi, mat& w, int& K, int& L) { // guarda se funziona mettendo il log, senno integra via M
+
+vec update_S(vec& pi, mat& w, int& K, Mat<int>& M,int& J, size_t* observations) { // guarda se funziona mettendo il log, senno integra via M
+    vec log_P(K,0);
     for (int k = 0; k < K; ++k) {
-        int prod = 1;
-        for (int l = 0; l < L; ++l) {
-            prod *= w(l,k);
+        float log_Pk = 0;
+        for (int j = 0; j < J; ++j) {
+            float log_lik = 0;
+            for (int nj = 0; nj < *(observations + j); ++nj) {
+                log_lik += log(w(M(nj,j),k)) + log(pi(k));
+            }
+            log_Pk += log_lik;
         }
-        pi(k) = pi(k) * prod;
+        log_P(k) = log_Pk;
     }
-    return pi;
+    return log_P;
 };
 
-mat update_w() {
+mat update_M() {
 
 };
 
