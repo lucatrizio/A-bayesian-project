@@ -235,7 +235,7 @@ private:
     mat w; // (L x K) scelto K, pesi per scegliere OC
     arma::Col<int> S; // (J x 1) assegna un DC ad ogni persona (J persone)
     Mat<int> M; // (J x max(n_j)) assegna per ogni persona un OC ad ogni atomo di quella persona (J persone e n_j atomo per persona j)
-    theta;
+    Theta theta; // (L x 1) ogni elemento di Theta è uno degli atomi comuni a tutti i DC
 
 
 public:
@@ -331,7 +331,7 @@ vec update_beta(vec& beta, arma::Mat<int>& M, int& L) {
     }
 };
 
-vec update_pi(vec& pi, mat& w, int& K, int& L) {
+vec update_pi(vec& pi, mat& w, int& K, int& L) { // guarda se funziona mettendo il log, senno integra via M
     for (int k = 0; k < K; ++k) {
         int prod = 1;
         for (int l = 0; l < L; ++l) {
@@ -346,4 +346,5 @@ mat update_w() {
 
 };
 
-
+// NON CI SONO DIRICHLET PROCESS
+// usare cholesky per estrarre dalla wishart
