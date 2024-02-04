@@ -3,16 +3,18 @@
 #include <armadillo>
 #include <random>
 #include <iostream>
-
+#include <math.h>
 using namespace std;
 using namespace arma;
 
 // TODO
 
+// CHANGE THETA CLASS -> USE VEC AND MATRIX FOR MEAN AND COVARIANCE
+
 // Sparse matrix for M? rows of different size
 // Dimension struct -> N is not an integer but a vector
-// log_w instead of w? -> change draw_w to draw_log_w -> change draw_M (it will take log_w instead of w)
-// update_M to be implemented (remeber to use log likelihood)
+
+// update_M to be implemented (remeber to use log likelihood) 
 // draw_theta to be implemented
 // update_theta to be implemented (remember to use log likelihood)
 
@@ -170,6 +172,10 @@ public:
         data[x][y][z]=n;
     }
 
+    double* get_vec(size_t x, size_t y){
+        return data[x][y];
+    }
+
     double get(size_t x, size_t y, size_t z){
         return data[x][y][z];
     }
@@ -259,8 +265,8 @@ private:
     vec alpha; // (K x 1) K:= numero di DC (passato in input)
     vec log_pi; // (K x 1) pesi per scegliere DC
     vec beta; // (L x 1) L := numero di OC (passato in input)
-    mat w; // (L x K) scelto K, pesi per scegliere OC
-    arma::Col<int> S; // (J x 1) assegna un DC ad ogni persona (J persone)
+    mat log_W; // (L x K) scelto K, pesi per scegliere OC
+    vec S; // (J x 1) assegna un DC ad ogni persona (J persone)
     mat M; // (J x max(n_j)) assegna per ogni persona un OC ad ogni atomo di quella persona (J persone e n_j atomo per persona j)
     Theta theta; // (L x 1) ogni elemento di Theta è uno degli atomi comuni a tutti i DC
 
@@ -272,11 +278,11 @@ public:
 
         // Generazione dei pesi pi e w
         log_pi = draw_log_pi(alpha); // genera i pesi per DC dalla Dirichlet
-        w = draw_W(beta, dim.K);
+        log_W = draw_log_W(beta, dim.K);
 
         // Generazione delle variabili categoriche S e M
         S = draw_S(log_pi, dim.J);
-        M = draw_M(w, S, dim.N, dim.J);
+        M = draw_M(log_W, S, dim.N, dim.J);
 
         // Generazione dei parametri theta
         theta = draw_theta();
@@ -288,10 +294,10 @@ public:
         beta = update_omega(beta, M, dim.L);
 
         log_pi = draw_log_pi(alpha);
-        log_pi = update_S(log_pi, w, dim.K, M, dim.J, data.get_atoms());
+        log_pi = update_S(log_pi, log_W, dim.K, M, dim.J, data.get_atoms());
 
-        w = draw_W(beta, dim.K);
-        w = update_W();
+        log_W  = draw_log_W(beta, dim.K);
+        log_W = update_M(log_W, dim.L, dim.K, theta, data, S);
 
 
     }
@@ -299,8 +305,8 @@ public:
 
     // Stampa
     void print(void) {
-        cout << "pi:\n" << exp(log_pi) << endl;
-        cout << "w:\n" << w << endl;
+        cout << "pi:\n" << arma::exp(log_pi) << endl;
+        cout << "w:\n" << arma::exp(log_W) << endl;
         cout << "S:\n" << S << endl;
         cout << "M:\n" << M << endl;
     }
@@ -313,19 +319,19 @@ vec draw_log_pi(vec& alpha) {
 };
 
 
-mat draw_W(vec& beta, int& K) {
-    mat w;
+mat draw_log_W(vec& beta, int& K) {
+    mat log_W;
     for (int k = 0; k < K; k++) {
-            vec w_k = generateDirichlet(beta); //genera un vettore dalla dirichlet per ogni k
-            w = arma::join_rows(w, w_k); // costruisce la matrice dei pesi aggiungendo ogni colonna
+            vec log_w_k = arma::log(generateDirichlet(beta)); //genera un vettore dalla dirichlet per ogni k
+            log_W = arma::join_rows(log_W, log_w_k); // costruisce la matrice dei pesi aggiungendo ogni colonna
         }
-    return w;
+    return log_W;
 };
 
 
-arma::Col<int> draw_S(arma::vec& log_pi, int J) {
-    arma::vec pi = exp(log_pi);
-    arma::Col<int> S;
+vec draw_S(arma::vec& log_pi, int J) {
+    arma::vec pi = arma::exp(log_pi);
+    vec S;
     S.set_size(J);
     std::default_random_engine generatore_random;
     discrete_distribution<int> Cat(pi.begin(), pi.end()); 
@@ -336,7 +342,8 @@ arma::Col<int> draw_S(arma::vec& log_pi, int J) {
 };
 
 
-mat draw_M(mat& w, arma::Col<int>& S, int& N, int& J)  {
+mat draw_M(mat& log_W, vec& S, int& N, int& J)  {
+    mat w = arma::exp(log_W);
     arma::mat M;
     M.zeros(J, N);
     std::default_random_engine generatore_random;
@@ -365,14 +372,14 @@ vec update_omega(vec& beta, mat M, int& L) {
 };
 
 
-vec update_S(vec& pi, mat& w, int& K, Mat<int>& M,int& J, size_t* observations) { // guarda se funziona mettendo il log, senno integra via M
+vec update_S(vec& log_pi, mat& log_W, int& K, mat& M,int& J, size_t* observations) { // guarda se funziona mettendo il log, senno integra via M
     vec log_P(K,0);
     for (int k = 0; k < K; ++k) {
         float log_Pk = 0;
         for (int j = 0; j < J; ++j) {
             float log_lik = 0;
-            for (int nj = 0; nj < *(observations + j); ++nj) {
-                log_lik += log(w(M(nj,j),k)) + log(pi(k));
+            for (int i = 0; i < *(observations + j); ++i) {
+                log_lik += log_W(M(i,j),k) + log_pi(k);
             }
             log_Pk += log_lik;
         }
@@ -381,7 +388,31 @@ vec update_S(vec& pi, mat& w, int& K, Mat<int>& M,int& J, size_t* observations) 
     return log_P;
 };
 
-mat update_M() {
+
+mat update_M(mat& log_W, int& L, int& K, Theta& theta, Data& data, vec& S) {
+    int N = data.getpeople();
+    mat log_WP((L,K),0);
+    for (int l = 0; l < L; ++l) {
+        int log_Wl = 0;
+        for (int j = 0; j < data.getpeople(); ++j) {
+            int log_Wli = 0;
+            for (int i = 0; i < *(data.get_atoms() + j); ++i) {
+                log_Wli += arma::log_normpdf(data.get_vec(i,j), theta.getMean(i)), theta.getCovariate(i)) + log_W(l,S(j))
+            }
+            log_Wl += log_Wli;
+        }
+        log_WP(l) = log_Wl;
+    }
+    return log_WP; 
+};
+
+
+Theta draw_theta() {
+
+};
+
+
+Theta update_Theta() {
 
 };
 
