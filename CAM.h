@@ -9,8 +9,6 @@ using namespace arma;
 
 // TODO
 
-// CHANGE THETA CLASS -> USE VEC AND MATRIX FOR MEAN AND COVARIANCE
-
 // Sparse matrix for M? rows of different size
 // Dimension struct -> N is not an integer but a vector
 
@@ -73,21 +71,6 @@ public:
         theta[l].covariance = cov;
     }
 
-
-    void set(size_t s, double *mean, double **covariance)
-    {
-
-        for (size_t i = 0; i < size_v; i++)
-        {
-            theta[s].mean[i] = mean[i];
-
-            for (size_t j = 0; j < size_v; j++)
-            {
-                theta[s].covariance[i][j] = covariance[i][j];
-            }
-        }
-    }
-
     size_t size(){
         return size_L;
     }
@@ -125,16 +108,11 @@ public:
     Data(size_t n, size_t *observations, size_t v) : n(n), observations(observations), v(v)
     {
 
-        data = new double **[n];
+        data = new vec *[n];
 
-        for (size_t i = 0; i < n; ++i)
+        for (size_t i = 0; i < observations[i]; ++i)
         {
-            data[i] = new double *[observations[i]];
-
-            for (size_t j = 0; j < observations[i]; ++j)
-            {
-                data[i][j] = new double[v];
-            }
+            data[i] = new vec[observations[i]];
         }
     }
 
@@ -143,46 +121,33 @@ public:
     {
         for (size_t i = 0; i < n; ++i)
         {
-            for (size_t j = 0; j < observations[i]; ++j)
-            {
-                delete[] data[i][j];
-            }
             delete[] data[i];
         }
 
         delete[] data;
     }
 
-    void set(size_t x, size_t y, size_t z, double n){
-        data[x][y][z]=n;
+    void set_vec(size_t x, size_t y, vec& v){
+        data[x][y]=v;
     }
 
     vec get_vec(size_t x, size_t y){
-        return *(*(data + x) + y);
-    }
-
-    double get(size_t x, size_t y, size_t z){
-        return data[x][y][z];
+        return data[x][y];
     }
 
     void print()
     {
-        for (size_t i = 0; i < n; i++)
+        for (size_t i = 0; i < n; ++i)
         {
-            for (size_t j = 0; j < observations[i]; j++)
+            std::cout << "Row " << i << ":\n";
+            for (size_t j = 0; j < observations[i]; ++j)
             {
-                std::cout << "(";
-                for (size_t k = 0; k < v; k++)
-                {
-                    std::cout << data[i][j][k] << " ";
-                }
-                std::cout << ") ";
+                std::cout << data[i][j] << std::endl;
             }
-            std::cout << std::endl;
         }
     }
 
-    size_t getpeople(){
+    size_t getNumPeople(){
         return n;
     }
 
@@ -191,16 +156,16 @@ public:
         return observations[i];
     }
 
-    size_t* get_atoms() {
+    size_t* get_observationsFor() {
         return observations;
     }
 
-    size_t get_dim() {
+    size_t get_dimObservation() {
         return v;
     }
 };
 
-
+/*
 //--------Technical comment--------
 //memory is self managed, armadillo doesn't allocate, delete[] array in main after use!
 arma::vec toArmaVec(double*array, size_t arraySize){
@@ -214,8 +179,8 @@ double* toStd(const arma::vec& vector, size_t*size){
     return vector.memptr();
     
 }
+*/
 
-// TODO: Getter and Setter, spostare le variabili da public a private e cambiare di conseguenza il codice con i vari.get() e .set()
 
 
 
