@@ -26,8 +26,8 @@ class Theta{
 private:
     struct Parameters
     {
-        double*mean;
-        double**covariance;
+        vec mean;
+        mat covariance;
     };
 
     Parameters*theta; //vector of parameters(mean and coavariance)
@@ -38,7 +38,7 @@ public:
     Theta(size_t L, size_t v) : size_L(L), size_v(v)
     {
         theta = new Parameters[L];
-
+        """
         for (size_t i = 0; i < L; i++)
         {
             theta[i].mean = new double[v];
@@ -50,52 +50,24 @@ public:
             }
             
         }
+        """
+        for (size_t l = 0; l < L; ++l) {
+            (theta + l)->mean.set_size(v);
+            (theta + l)->covariance.set_size(v,v);
+        }
         
     }
 
-    // Destructor
-    ~Theta()
-    {
-        for (size_t i = 0; i < size_L; ++i)
-        {
-            delete[] theta[i].mean;
+    // Destructor DA RIFARE?
 
-            for (size_t j = 0; j < size_v; j++)
-            {
-                delete[] theta[i].covariance[j];
-            }
-            delete[] theta[i].covariance;
-        }
-
-        delete[] theta;
+    void set_mean(int& l, vec& mu) {
+        (theta + l)-> mean = mu;
     }
 
-    void print(){
-        for (size_t i = 0; i < size_L; i++)
-        {
-            std::cout << "mean" << i << ":(";
-            for (size_t j = 0; j < size_v; j++)
-            {
-                std::cout << theta[i].mean[j] << ",";
-            }
-            std::cout << ")  covariance" << i << ":(";
-
-            for (size_t j = 0; j < size_v; j++)
-            {
-                std::cout << "[";
-                for (size_t k = 0; k < size_v; k++)
-                {
-                    std::cout << theta[i].covariance[j][k] << ",";
-                }
-                std::cout << "] ";
-                
-            }
-
-            std::cout << ")";
-            std::cout << std::endl;
-            
-        } 
+    void set_covariance(int& l, mat& cov) {
+        (theta + l)-> covariance = cov;
     }
+
 
     void set(size_t s, double *mean, double **covariance)
     {
@@ -113,7 +85,7 @@ public:
 
     Parameters getParametersOf(size_t i)
     {
-        return theta[i];
+        return *(theta + i);
     } 
 
     double *getMean(size_t i)
@@ -130,7 +102,7 @@ public:
 
 class Data {
 private:
-    double***data;
+    vec** data;
     size_t n, //number of people
     *observations, //number of observations for each person
     v; //number of observed parameters for each observation
@@ -172,8 +144,8 @@ public:
         data[x][y][z]=n;
     }
 
-    double* get_vec(size_t x, size_t y){
-        return data[x][y];
+    vec get_vec(size_t x, size_t y){
+        return *(*(data + x) + y);
     }
 
     double get(size_t x, size_t y, size_t z){
@@ -208,6 +180,10 @@ public:
 
     size_t* get_atoms() {
         return observations;
+    }
+
+    size_t get_dim() {
+        return v;
     }
 };
 
@@ -254,6 +230,20 @@ vec generateDirichlet(const vec& alpha) {
     return gammaSample / sum(gammaSample);
 }
 
+// Genera casualmente un vettore da una distribuzione normale multivariata
+vec generateRandomVector(const vec& mean, const mat& covariance) {
+    int dim = mean.size();
+    vec randomVector = mean + chol(covariance, "lower") * randn<vec>(dim);
+    return randomVector;
+}
+
+// Genera casualmente una matrice da una distribuzione inverse wishart
+mat generateRandomMatrix(int degreesOfFreedom, const mat& scaleMatrix) {
+    mat randomMatrix = iwishrnd(scaleMatrix, degreesOfFreedom);
+    return randomMatrix;
+}
+
+
 
 
 class Chain{
@@ -285,7 +275,7 @@ public:
         M = draw_M(log_W, S, dim.N, dim.J);
 
         // Generazione dei parametri theta
-        theta = draw_theta();
+        draw_theta(theta, dim.L);
     }
 
 
@@ -297,8 +287,9 @@ public:
         log_pi = update_S(log_pi, log_W, dim.K, M, dim.J, data.get_atoms());
 
         log_W  = draw_log_W(beta, dim.K);
-        log_W = update_M(log_W, dim.L, dim.K, theta, data, S);
+        log_W = update_M(log_W, dim.L, dim.K, theta, data, S, M);
 
+        theta = update_theta(theta, data);
 
     }
 
@@ -357,7 +348,7 @@ mat draw_M(mat& log_W, vec& S, int& N, int& J)  {
 };
 
 
-vec update_pi(vec& alpha, arma::Col<int>& S, int& K) {
+vec update_pi(vec& alpha, vec& S, int& K) {
     for (int k = 0; k < K; ++k) {
         alpha(k) = alpha(k) + arma::accu(S == k);
     }
@@ -389,7 +380,16 @@ vec update_S(vec& log_pi, mat& log_W, int& K, mat& M,int& J, size_t* observation
 };
 
 
-mat update_M(mat& log_W, int& L, int& K, Theta& theta, Data& data, vec& S) {
+double logLikelihood(const vec& x, const vec& mean, const mat& covariance) {
+    int dim = x.size();
+    double expTerm = -0.5 * as_scalar(trans(x - mean) * inv(covariance) * (x - mean));
+    double normalization = -0.5 * dim * log(2.0 * M_PI) - 0.5 * log(det(covariance));
+    double logLik = normalization + expTerm;
+    return logLik;
+}
+
+
+mat update_M(mat& log_W, int& L, int& K, Theta& theta, Data& data, vec& S, mat& M) {
     int N = data.getpeople();
     mat log_WP((L,K),0);
     for (int l = 0; l < L; ++l) {
@@ -397,7 +397,7 @@ mat update_M(mat& log_W, int& L, int& K, Theta& theta, Data& data, vec& S) {
         for (int j = 0; j < data.getpeople(); ++j) {
             int log_Wli = 0;
             for (int i = 0; i < *(data.get_atoms() + j); ++i) {
-                log_Wli += arma::log_normpdf(data.get_vec(i,j), theta.getMean(i)), theta.getCovariate(i)) + log_W(l,S(j))
+                log_Wli += logLikelihood(data.get_vec(i,j), theta.getParametersOf(M(i,j)).mean, theta.getParametersOf(M(i,j)).covariance) + log_W(M(i,j), S(j));
             }
             log_Wl += log_Wli;
         }
@@ -407,14 +407,67 @@ mat update_M(mat& log_W, int& L, int& K, Theta& theta, Data& data, vec& S) {
 };
 
 
-Theta draw_theta() {
-
+Theta draw_theta(Theta& theta, int& L) {
+    // estrai da una NIW
+    for (int l = 0; l < L; ++l) {
+        vec mu = generateRandomVector(mean0, cov0); // DA DECIDERE I PARAMETRI DELLA PRIOR DELLA NIW
+        mat cov = generateRandomMatrix(df, scale_mat);
+        theta.set_mean(l, mu);
+        theta.set_covariance(l,cov);
+    }
+    return theta;
 };
 
 
 Theta update_Theta() {
-
+    // aggiorna una NIW 
 };
 
 // NON CI SONO DIRICHLET PROCESS
 // usare cholesky per estrarre dalla wishart
+
+    
+    """
+    ~Theta()
+    {
+        for (size_t i = 0; i < size_L; ++i)
+        {
+            delete[] theta[i].mean;
+
+            for (size_t j = 0; j < size_v; j++)
+            {
+                delete[] theta[i].covariance[j];
+            }
+            delete[] theta[i].covariance;
+        }
+
+        delete[] theta;
+    }
+    
+    void print(){
+        for (size_t i = 0; i < size_L; i++)
+        {
+            std::cout << "mean" << i << ":(";
+            for (size_t j = 0; j < size_v; j++)
+            {
+                std::cout << theta[i].mean[j] << ",";
+            }
+            std::cout << ")  covariance" << i << ":(";
+
+            for (size_t j = 0; j < size_v; j++)
+            {
+                std::cout << "[";
+                for (size_t k = 0; k < size_v; k++)
+                {
+                    std::cout << theta[i].covariance[j][k] << ",";
+                }
+                std::cout << "] ";
+                
+            }
+
+            std::cout << ")";
+            std::cout << std::endl;
+            
+        } 
+    }
+    """
