@@ -38,7 +38,7 @@ public:
     Theta(size_t L, size_t v) : size_L(L), size_v(v)
     {
         theta = new Parameters[L];
-        """
+        /*
         for (size_t i = 0; i < L; i++)
         {
             theta[i].mean = new double[v];
@@ -50,22 +50,27 @@ public:
             }
             
         }
-        """
+        */
         for (size_t l = 0; l < L; ++l) {
-            (theta + l)->mean.set_size(v);
-            (theta + l)->covariance.set_size(v,v);
+            theta[l].mean.set_size(v);
+            theta[l].coavariance.set_size(v,v);
+            
         }
         
     }
 
-    // Destructor DA RIFARE?
-
-    void set_mean(int& l, vec& mu) {
-        (theta + l)-> mean = mu;
+    // Destructor
+    ~Theta() {
+        
+        delete[] theta;
     }
 
-    void set_covariance(int& l, mat& cov) {
-        (theta + l)-> covariance = cov;
+    void set_mean(size_t l, const vec& mu) {
+        theta[l].mean = mu;
+    }
+
+    void set_covariance(int& l, const mat& cov) {
+        theta[l].covariance = cov;
     }
 
 
@@ -83,19 +88,27 @@ public:
         }
     }
 
-    Parameters getParametersOf(size_t i)
-    {
-        return *(theta + i);
-    } 
+    size_t size(){
+        return size_L;
+    }
+    size_t size_v(){
+        return size_v;
+    }
 
-    double *getMean(size_t i)
-    {
+    Parameters get(size_t i){
+        return theta[i];
+    }
+
+    arma::Vec get_mean(size_t i){
         return theta[i].mean;
     }
 
-    double **getCovariate(size_t i)
-    {
+    arma::mat get_cov(size_t i){
+
         return theta[i].covariance;
+    }
+    std::vector<std::vector<int>> get_DAG(size_t i){
+        return theta[i].DAG;
     }
 
 };
@@ -190,7 +203,7 @@ public:
 
 //--------Technical comment--------
 //memory is self managed, armadillo doesn't allocate, delete[] array in main after use!
-arma::vec toArma(double*array, size_t arraySize){
+arma::vec toArmaVec(double*array, size_t arraySize){
     return arma::vec(array, arraySize, false);
 }
 
