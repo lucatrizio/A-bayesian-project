@@ -234,7 +234,7 @@ private:
     Dimensions dim; //input
     vec alpha; // (K x 1) K:= numero di DC (passato in input)
     vec log_pi; // (K x 1) pesi per scegliere DC
-    vec beta; // (L x 1) L := numero di OC (passato in input)
+    mat beta; // (L x K) L := numero di OC (passato in input) x numero di DC
     mat log_W; // (L x K) scelto K, pesi per scegliere OC
     vec S; // (J x 1) assegna un DC ad ogni persona (J persone)
     mat M; // (max(n_j) x J) assegna per ogni persona un OC ad ogni atomo di quella persona (J persone e n_j atomo per persona j)
@@ -270,7 +270,7 @@ public:
 
     // UPDATE OBSERVATIONAL CLUSTERS
         // UPDATE OMEGA (prima aggiorno i pesi poi i nuovi valori di omega)
-        beta = update_omega(beta, M, dim.L);
+        beta = update_omega(beta, M, dim.L, dim.K, S);
         log_W  = draw_log_W(beta, dim.K);
         // UPDATE M (prima aggiorno i pesi e poi i nuovi valori di M)
         log_W = update_M(log_W, dim.L, dim.K, theta, data, S, M);
@@ -298,10 +298,10 @@ vec draw_log_pi(vec& alpha) {
 };
 
 
-mat draw_log_W(vec& beta, int& K) {
+mat draw_log_W(mat& beta, int& K) {
     mat log_W;
     for (int k = 0; k < K; k++) {
-            vec log_w_k = arma::log(generateDirichlet(beta)); //genera un vettore dalla dirichlet per ogni k
+            vec log_w_k = arma::log(generateDirichlet(beta.col(k))); //genera un vettore dalla dirichlet per ogni k
             log_W = arma::join_rows(log_W, log_w_k); // costruisce la matrice dei pesi aggiungendo ogni colonna
         }
     return log_W;
@@ -344,9 +344,11 @@ vec update_pi(vec& alpha, vec& S, int& K) {
 };
 
 
-vec update_omega(vec& beta, mat M, int& L) {
-    for (int l = 0; l < L; ++l) {
-        beta(l) = beta(l) + arma::accu(M == l);
+vec update_omega(mat& beta, mat M, int& L, int& K, vec& S) {
+    for (int k = 0; k < K; ++k) {
+        for (int l = 0; l < L; ++l) {
+            beta.col(k)(l) += arma::accu(M.cols(arma::find(S = k)) == l);
+        }
     }
 };
 
