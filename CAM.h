@@ -51,7 +51,7 @@ public:
         */
         for (size_t l = 0; l < L; ++l) {
             theta[l].mean.set_size(v);
-            theta[l].coavariance.set_size(v,v);
+            theta[l].covariance.set_size(v,v);
             
         }
         
@@ -82,7 +82,7 @@ public:
         return theta[i];
     }
 
-    arma::Vec get_mean(size_t i){
+    arma::vec get_mean(size_t i){
         return theta[i].mean;
     }
 
@@ -189,7 +189,8 @@ struct Dimensions{
     int K; //n of DC
     int L; //n of OC
     int V; //dimensions of one data
-    int N; //numero di osservazioni per persona
+    int* N; //numero di osservazioni per persona
+    int max_N;
 }; //non  credo nj serva // si serve 
 
 
@@ -207,6 +208,7 @@ vec generateDirichlet(const vec& alpha) {
     // Normalizza il campione per ottenere una variabile casuale Dirichlet
     return gammaSample / sum(gammaSample);
 }
+
 
 // Genera casualmente un vettore da una distribuzione normale multivariata
 vec generateRandomVector(const vec& mean, const mat& covariance) {
@@ -235,7 +237,7 @@ private:
     vec beta; // (L x 1) L := numero di OC (passato in input)
     mat log_W; // (L x K) scelto K, pesi per scegliere OC
     vec S; // (J x 1) assegna un DC ad ogni persona (J persone)
-    mat M; // (J x max(n_j)) assegna per ogni persona un OC ad ogni atomo di quella persona (J persone e n_j atomo per persona j)
+    mat M; // (max(n_j) x J) assegna per ogni persona un OC ad ogni atomo di quella persona (J persone e n_j atomo per persona j)
     Theta theta; // (L x 1) ogni elemento di Theta è uno degli atomi comuni a tutti i DC
 
 
@@ -250,25 +252,33 @@ public:
 
         // Generazione delle variabili categoriche S e M
         S = draw_S(log_pi, dim.J);
-        M = draw_M(log_W, S, dim.N, dim.J);
+        M = draw_M(log_W, S, dim.N, dim.J, dim.max_N);
 
         // Generazione dei parametri theta
-        draw_theta(theta, dim.L);
+        theta = draw_theta(theta, dim.L);
     }
 
 
     void chain_step(void) {
+    //UPDATE DISTRIBUTIONAL CLUSTERS
+        // UPDATE PI (prima aggiorno i pesi e poi i nuovi valori di pi)
         alpha = update_pi(alpha, S, dim.K);
-        beta = update_omega(beta, M, dim.L);
-
         log_pi = draw_log_pi(alpha);
-        log_pi = update_S(log_pi, log_W, dim.K, M, dim.J, data.get_atoms());
+        // UPDATE S (prima aggiorno i pesi e poi i nuovi valori di S)
+        log_pi = update_S(log_pi, log_W, dim.K, M, dim.J, data.get_observationsFor());
+        S = draw_S(log_pi, dim.J);
 
+    // UPDATE OBSERVATIONAL CLUSTERS
+        // UPDATE OMEGA (prima aggiorno i pesi poi i nuovi valori di omega)
+        beta = update_omega(beta, M, dim.L);
         log_W  = draw_log_W(beta, dim.K);
+        // UPDATE M (prima aggiorno i pesi e poi i nuovi valori di M)
         log_W = update_M(log_W, dim.L, dim.K, theta, data, S, M);
-
+        M = draw_M(log_W, S, dim.N, dim.J, dim.max_N);
+    
+    // UPDATE PARAMETERS
+        // UPDATE THETA (da chiamare su R)
         theta = update_theta(theta, data);
-
     }
 
 
@@ -311,15 +321,15 @@ vec draw_S(arma::vec& log_pi, int J) {
 };
 
 
-mat draw_M(mat& log_W, vec& S, int& N, int& J)  {
+mat draw_M(mat& log_W, vec& S, int* N, int& J, int& max_N)  {
     mat w = arma::exp(log_W);
     arma::mat M;
-    M.zeros(J, N);
+    M.zeros(max_N,J);
     std::default_random_engine generatore_random;
     for (int j = 0; j < J; ++j) {
         discrete_distribution<int> Cat_w(w.col(S(j)).begin(), w.col(S(j)).end());
-        for (int i = 0; i < N; i++) {
-            M(j,i) = Cat_w(generatore_random); // genera M(matrice J x N) per ogni persona (j), genera N valori da categoriche seguendo la distribuzione Cat_w
+        for (int i = 0; i < *(N+j); i++) {
+            M(i,j) = Cat_w(generatore_random); // genera M(matrice J x N) per ogni persona (j), genera N valori da categoriche seguendo la distribuzione Cat_w
         }
     }
     return M;
@@ -368,14 +378,14 @@ double logLikelihood(const vec& x, const vec& mean, const mat& covariance) {
 
 
 mat update_M(mat& log_W, int& L, int& K, Theta& theta, Data& data, vec& S, mat& M) {
-    int N = data.getpeople();
+    int N = data.getNumPeople();
     mat log_WP((L,K),0);
     for (int l = 0; l < L; ++l) {
         int log_Wl = 0;
-        for (int j = 0; j < data.getpeople(); ++j) {
+        for (int j = 0; j < data.getNumPeople(); ++j) {
             int log_Wli = 0;
-            for (int i = 0; i < *(data.get_atoms() + j); ++i) {
-                log_Wli += logLikelihood(data.get_vec(i,j), theta.getParametersOf(M(i,j)).mean, theta.getParametersOf(M(i,j)).covariance) + log_W(M(i,j), S(j));
+            for (int i = 0; i < data.get_atom(j); ++i) {
+                log_Wli += logLikelihood(data.get_vec(i,j), theta.get_mean(M(i,j)), theta.get_cov(M(i,j)) + log_W(M(i,j), S(j)));
             }
             log_Wl += log_Wli;
         }
@@ -405,7 +415,7 @@ Theta update_Theta() {
 // usare cholesky per estrarre dalla wishart
 
     
-    """
+    /*
     ~Theta()
     {
         for (size_t i = 0; i < size_L; ++i)
@@ -448,4 +458,4 @@ Theta update_Theta() {
             
         } 
     }
-    """
+    */
