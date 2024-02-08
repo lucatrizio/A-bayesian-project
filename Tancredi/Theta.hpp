@@ -3,7 +3,6 @@
 //
 
 
-
 #ifndef A_BAYESIAN_PROJECT_THETA_HPP
 #define A_BAYESIAN_PROJECT_THETA_HPP
 #include <math.h>
@@ -17,8 +16,8 @@ using namespace arma;
 
 struct Parameters
 {
-    double*mean;
-    double**covariance;
+    vec mean;
+    mat covariance;
 };
 
 class Theta{
@@ -35,13 +34,19 @@ public:
 
     void print();
 
-    void set(size_t s, double *mean, double **covariance);
+    void set_mean(size_t& l, const vec& mu);
 
-    Parameters getParametersOf(size_t i);
+    void set_covariance(size_t& l, const mat& cov);
 
-    double *getMean(size_t i);
+    size_t size();
 
-    double **getCovariate(size_t i);
+    size_t get_size_v();
+
+    Parameters get(size_t i);
+
+    vec get_mean(size_t i);
+
+    mat get_cov(size_t i);
 };
 
 

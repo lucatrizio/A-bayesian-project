@@ -16,32 +16,32 @@ using namespace arma;
 
 class Data {
 private:
-    double***data;
-    size_t n, //number of people
+    vec**data;
+    size_t J, //number of people
     *observations, //number of observations for each person
     v; //number of observed parameters for each observation
 
 public:
     // Constructor
-    Data(size_t n, size_t *observations, size_t v);
+    Data(size_t J, size_t *observations, size_t v);
 
     // Destructor
     ~Data();
 
-    void set(size_t x, size_t y, size_t z, double n);
+    void set_vec(size_t x, size_t y, vec& v);
 
-    double get(size_t x, size_t y, size_t z);
-
-    double* get_vec(size_t x, size_t y)
+    vec get_vec(size_t x, size_t y);
 
     void print();
 
-    size_t getpeople();
+    size_t getNumPeople();
 
     //returns the number of observations for a certain person i
     size_t get_atom(size_t i);
 
-    size_t* get_atoms();
+    size_t* get_observationsFor();
+
+    size_t get_dimObservation();
 };
 
 

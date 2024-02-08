@@ -4,73 +4,60 @@
 
 #include "Data.hpp"
 
-Data::Data(size_t n, size_t *observations, size_t v) : n(n), observations(observations), v(v)
-{
-
-    data = new double **[n];
-
-    for (size_t i = 0; i < n; ++i)
+Data::Data(size_t J, size_t *observations, size_t v) : J(J), observations(observations), v(v)
     {
-        data[i] = new double *[observations[i]];
 
-        for (size_t j = 0; j < observations[i]; ++j)
+        data = new vec *[J];
+
+        for (size_t i = 0; i < observations[i]; ++i)
         {
-            data[i][j] = new double[v];
+            data[i] = new vec[observations[i]];
         }
     }
-}
 
-~Data::Data()
-{
-    for (size_t i = 0; i < n; ++i)
+
+Data::~Data()
     {
-        for (size_t j = 0; j < observations[i]; ++j)
+        for (size_t i = 0; i < J; ++i)
         {
-            delete[] data[i][j];
+            delete[] data[i];
         }
-        delete[] data[i];
+
+        delete[] data;
     }
 
-    delete[] data;
+void Data::set_vec(size_t x, size_t y, vec& v){
+    data[x][y]=v;
 }
 
-void Data::set(size_t x, size_t y, size_t z, double n){
-    data[x][y][z]=n;
-}
-
-double* Data::get_vec(size_t x, size_t y){
+vec Data::get_vec(size_t x, size_t y){
     return data[x][y];
 }
 
-double Data::get(size_t x, size_t y, size_t z){
-    return data[x][y][z];
-}
-
 void Data::print()
-{
-    for (size_t i = 0; i < n; i++)
     {
-        for (size_t j = 0; j < observations[i]; j++)
+        for (size_t i = 0; i < J; ++i)
         {
-            std::cout << "(";
-            for (size_t k = 0; k < v; k++)
+            std::cout << "Row " << i << ":\n";
+            for (size_t j = 0; j < observations[i]; ++j)
             {
-                std::cout << data[i][j][k] << " ";
+                std::cout << data[i][j] << std::endl;
             }
-            std::cout << ") ";
         }
-        std::cout << std::endl;
     }
-}
 
-size_t Data::getpeople(){
-    return n;
+size_t Data::getNumPeople(){
+    return J;
 }
 
 size_t Data::get_atom(size_t i){
     return observations[i];
 }
 
-size_t* Data::get_atoms() {
+size_t* Data::get_observationsFor() {
     return observations;
+}
+
+size_t Data::get_dimObservation() {
+    return v;
 }
