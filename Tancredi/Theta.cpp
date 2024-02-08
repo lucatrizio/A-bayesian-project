@@ -48,3 +48,4 @@ arma::vec Theta::get_mean(size_t i){
 arma::mat Theta::get_cov(size_t i){
     return theta[i].covariance;
 }
+

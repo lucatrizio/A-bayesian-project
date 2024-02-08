@@ -37,7 +37,7 @@ void Chain::chain_step(void) {
     
     // UPDATE PARAMETERS
         // UPDATE THETA (da chiamare su R)
-        theta = update_theta(theta, data);
+        theta = update_theta();
 
 }
 
@@ -175,6 +175,10 @@ mat Chain::update_M(mat& log_W, size_t& L, size_t& K, Theta& theta, Data& data, 
     }
     return M;
 };
+
+Theta Chain::update_theta() {
+    return theta;
+}
 
 
 vec generateDirichlet(const vec& alpha) {

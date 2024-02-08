@@ -23,7 +23,7 @@ private:
 
 public:
     // Constructor
-    Data(size_t J, size_t *observations, size_t v);
+    Data(size_t J_input, size_t* observations_input, size_t v_input);
 
     // Destructor
     ~Data();

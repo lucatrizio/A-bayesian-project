@@ -55,7 +55,7 @@ public:
     mat update_omega(mat& beta, mat M, size_t& L, size_t& K, vec& S);
     vec update_S(vec& log_pi, mat& log_W, size_t& K, mat& M, size_t& J, size_t* observations);
     mat update_M(mat& log_W, size_t& L, size_t& K, Theta& theta, Data& data, vec& S, mat& M, size_t& N, size_t* observations);
-    Theta update_Theta(); //da chiamare con R
+    Theta update_theta(); //da chiamare con R
 };
 
 // funzione per valutare la likelihood in un determinato punto multivariato
@@ -70,10 +70,11 @@ vec generateRandomVector(const vec& mean, const mat& covariance);
 // Genera casualmente una matrice da una distribuzione inverse wishart
 mat generateRandomMatrix(int degreesOfFreedom, const mat& scaleMatrix);
 
-
+/*
 arma::vec toArma(double*array, size_t arraySize){
     return arma::vec(array, arraySize, false);
 }
+*/
 
 /*
 //--------Technical comment--------

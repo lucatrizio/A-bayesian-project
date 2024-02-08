@@ -4,9 +4,10 @@
 
 #include "Data.hpp"
 
-Data::Data(size_t J, size_t *observations, size_t v) : J(J), observations(observations), v(v)
-    {
-
+Data::Data(size_t J_input, size_t* observations_input, size_t v_input) {
+        J = J_input;
+        observations = observations_input;
+        v = v_input;
         data = new vec *[J];
 
         for (size_t i = 0; i < observations[i]; ++i)
