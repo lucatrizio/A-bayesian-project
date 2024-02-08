@@ -264,17 +264,16 @@ public:
         // UPDATE PI (prima aggiorno i pesi e poi i nuovi valori di pi)
         alpha = update_pi(alpha, S, dim.K);
         log_pi = draw_log_pi(alpha);
-        // UPDATE S (prima aggiorno i pesi e poi i nuovi valori di S)
-        log_pi = update_S(log_pi, log_W, dim.K, M, dim.J, data.get_observationsFor());
-        S = draw_S(log_pi, dim.J);
+
+        S = update_S(log_pi, log_W, dim.K, M, dim.J, data.get_observationsFor());
 
     // UPDATE OBSERVATIONAL CLUSTERS
         // UPDATE OMEGA (prima aggiorno i pesi poi i nuovi valori di omega)
         beta = update_omega(beta, M, dim.L, dim.K, S);
         log_W  = draw_log_W(beta, dim.K);
         // UPDATE M (prima aggiorno i pesi e poi i nuovi valori di M)
-        log_W = update_M(log_W, dim.L, dim.K, theta, data, S, M);
-        M = draw_M(log_W, S, dim.N, dim.J, dim.max_N);
+
+        M = update_M(log_W, dim.L, dim.K, theta, data, S, M, dim.max_N, data.get_observationsFor());
     
     // UPDATE PARAMETERS
         // UPDATE THETA (da chiamare su R)
@@ -354,19 +353,23 @@ vec update_omega(mat& beta, mat M, int& L, int& K, vec& S) {
 
 
 vec update_S(vec& log_pi, mat& log_W, int& K, mat& M,int& J, size_t* observations) { // guarda se funziona mettendo il log, senno integra via M
-    vec log_P(K,0);
-    for (int k = 0; k < K; ++k) {
-        float log_Pk = 0;
-        for (int j = 0; j < J; ++j) {
-            float log_lik = 0;
-            for (int i = 0; i < *(observations + j); ++i) {
-                log_lik += log_W(M(i,j),k) + log_pi(k);
-            }
-            log_Pk += log_lik;
+    vec S;
+    S.set_size(J);
+    for (int j = 0; j < J; ++j){
+        vec log_P(K,0);
+        for (int k = 0; k < K; ++k) {
+            float log_Pk = 0;
+                for (int i = 0; i < *(observations + j); ++i) {
+                    log_Pk += log_W(M(i,j),k) + log_pi(k);
+                }
+            log_P(k) = log_Pk;
         }
-        log_P(k) = log_Pk;
+        vec pi = arma::exp(log_P);
+        std::default_random_engine generatore_random;
+        discrete_distribution<int> Cat(pi.begin(), pi.end()); 
+        S(j) = Cat(generatore_random);
     }
-    return log_P;
+    return S;
 };
 
 
@@ -379,22 +382,27 @@ double logLikelihood(const vec& x, const vec& mean, const mat& covariance) {
 }
 
 
-mat update_M(mat& log_W, int& L, int& K, Theta& theta, Data& data, vec& S, mat& M) {
-    int N = data.getNumPeople();
-    mat log_WP((L,K),0);
-    for (int l = 0; l < L; ++l) {
-        int log_Wl = 0;
-        for (int j = 0; j < data.getNumPeople(); ++j) {
-            int log_Wli = 0;
-            for (int i = 0; i < data.get_atom(j); ++i) {
-                log_Wli += logLikelihood(data.get_vec(i,j), theta.get_mean(M(i,j)), theta.get_cov(M(i,j)) + log_W(M(i,j), S(j)));
+mat update_M(mat& log_W, int& L, int& K, Theta& theta, Data& data, vec& S, mat& M, int& N, size_t* observations) {
+    int J = data.getNumPeople();
+    mat M;
+    M.set_size((J,N));
+    for (int j = 0; j < J; ++j) {
+        int k = S(j);
+        for (int i = 0; i < *(observations + j); ++i) {
+            vec log_Wk;
+            log_Wk.set_size(L);
+            for (int l = 0; l < L; ++l) {
+                log_Wk(l) = log_W(l,k) + logLikelihood(data.get_vec(i,j), theta.get_mean(l), theta.get_cov(l));
             }
-            log_Wl += log_Wli;
+            vec Wk = arma::exp(log_Wk);
+            std::default_random_engine generatore_random;
+            discrete_distribution<int> Cat(Wk.begin(), Wk.end()); 
+            M(i,j) = Cat(generatore_random);
         }
-        log_WP(l) = log_Wl;
     }
-    return log_WP; 
+    return M;
 };
+
 
 
 Theta draw_theta(Theta& theta, int& L) {
