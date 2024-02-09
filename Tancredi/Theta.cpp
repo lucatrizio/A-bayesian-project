@@ -18,7 +18,12 @@ Theta::~Theta(){
 }
 
 void Theta::print(){
-
+    for (int l = 0; l < size_L; ++l) {
+        std::cout << "mean" << l << std::endl;
+        theta[l].mean.print();
+        std::cout << "covariance" << l <<  std::endl;
+        theta[l].covariance.print();
+    }
 }
 
 void Theta::set_mean(size_t& l, const vec& mu) {
