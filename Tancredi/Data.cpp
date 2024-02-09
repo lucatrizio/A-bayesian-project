@@ -10,7 +10,7 @@ Data::Data(size_t J_input, size_t* observations_input, size_t v_input) {
         v = v_input;
         data = new vec *[J];
 
-        for (size_t i = 0; i < observations[i]; ++i)
+        for (size_t i = 0; i < J; ++i)
         {
             data[i] = new vec[observations[i]];
         }
@@ -19,12 +19,7 @@ Data::Data(size_t J_input, size_t* observations_input, size_t v_input) {
 
 Data::~Data()
     {
-        for (size_t i = 0; i < J; ++i)
-        {
-            delete[] data[i];
-        }
-
-        delete[] data;
+        
     }
 
 void Data::set_vec(size_t x, size_t y, vec& v){
@@ -37,6 +32,7 @@ vec Data::get_vec(size_t x, size_t y){
 
 void Data::print()
     {
+        
         for (size_t i = 0; i < J; ++i)
         {
             std::cout << "Row " << i << ":\n";

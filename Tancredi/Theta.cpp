@@ -14,7 +14,7 @@ Theta::Theta(size_t L, size_t v) : size_L(L), size_v(v){
 }
 
 Theta::~Theta(){
-    delete[] theta;
+    //delete[] theta;
 }
 
 void Theta::print(){
