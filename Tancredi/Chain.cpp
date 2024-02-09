@@ -4,7 +4,7 @@
 
 #include "Chain.hpp"
 
-Chain::Chain(const Dimensions& input_dim, const vec& input_alpha, const vec& input_beta, Data& input_data) : dim(input_dim), alpha(input_alpha), beta(input_beta), data(input_data), theta(dim.L, dim.v) {
+Chain::Chain(const Dimensions& input_dim, const vec& input_alpha, const mat& input_beta, Data& input_data) : dim(input_dim), alpha(input_alpha), beta(input_beta), data(input_data), theta(dim.L, dim.v) {
 
     // Generazione dei pesi pi e w
     log_pi = draw_log_pi(alpha); // genera i pesi per DC dalla Dirichlet
@@ -16,7 +16,6 @@ Chain::Chain(const Dimensions& input_dim, const vec& input_alpha, const vec& inp
 
     // Generazione dei parametri theta
     theta = draw_theta(dim.L, dim.v);
-
 }
 
 void Chain::chain_step(void) {
@@ -25,14 +24,13 @@ void Chain::chain_step(void) {
         alpha = update_pi(alpha, S, dim.K);
         log_pi = draw_log_pi(alpha);
 
-        S = update_S(log_pi, log_W, dim.K, M, dim.J, data.get_observationsFor());
+        S = update_S(S, log_pi, log_W, dim.K, M, dim.J, data.get_observationsFor());
 
     // UPDATE OBSERVATIONAL CLUSTERS
         // UPDATE OMEGA (prima aggiorno i pesi poi i nuovi valori di omega)
         beta = update_omega(beta, M, dim.L, dim.K, S);
         log_W  = draw_log_W(beta, dim.K);
         // UPDATE M (prima aggiorno i pesi e poi i nuovi valori di M)
-
         M = update_M(log_W, dim.L, dim.K, theta, data, S, M, dim.max_N, data.get_observationsFor());
     
     // UPDATE PARAMETERS
@@ -57,7 +55,7 @@ vec Chain::draw_log_pi(vec& alpha) {
 mat Chain::draw_log_W(mat& beta, size_t& K) {
     mat log_W;
     for (int k = 0; k < K; k++) {
-        vec log_w_k = arma::log(generateDirichlet(beta)); //genera un vettore dalla dirichlet per ogni k
+        vec log_w_k = arma::log(generateDirichlet(beta.col(k))); //genera un vettore dalla dirichlet per ogni k
         log_W = arma::join_rows(log_W, log_w_k); // costruisce la matrice dei pesi aggiungendo ogni colonna
     }
     return log_W;
@@ -106,6 +104,7 @@ Theta Chain::draw_theta(size_t& L, size_t& v) {
         theta.set_mean(l, mu);
         theta.set_covariance(l,cov);
     }
+
     return theta;
 };
 
@@ -120,18 +119,18 @@ vec Chain::update_pi(vec& alpha, vec& S, size_t& K) {
 mat Chain::update_omega(mat& beta, mat M, size_t& L, size_t& K, vec& S) {
     for (int k = 0; k < K; ++k) {
         for (int l = 0; l < L; ++l) {
-            beta.col(k)(l) += arma::accu(M.cols(arma::find(S = k)) == l);
+            arma::mat Mk = M.cols(arma::find(S == k));
+            beta(l,k) += arma::accu(Mk == l);
         }
     }
     return beta;
 };
 
 
-vec Chain::update_S(vec& log_pi, mat& log_W, size_t& K, mat& M, size_t& J, size_t* observations) { // guarda se funziona mettendo il log, senno integra via M
-    vec S;
-    S.set_size(J);
+vec Chain::update_S(vec& S, vec& log_pi, mat& log_W, size_t& K, mat& M, size_t& J, size_t* observations) { // guarda se funziona mettendo il log, senno integra via M
+    std::default_random_engine generatore_random;
     for (int j = 0; j < J; ++j){
-        vec log_P(K,0);
+        vec log_P(K,arma::fill::zeros);
         for (int k = 0; k < K; ++k) {
             float log_Pk = 0;
                 for (int i = 0; i < *(observations + j); ++i) {
@@ -140,7 +139,7 @@ vec Chain::update_S(vec& log_pi, mat& log_W, size_t& K, mat& M, size_t& J, size_
             log_P(k) = log_Pk;
         }
         vec pi = arma::exp(log_P);
-        std::default_random_engine generatore_random;
+        pi = arma::normalise(pi, 1);
         discrete_distribution<int> Cat(pi.begin(), pi.end()); 
         S(j) = Cat(generatore_random);
     }
@@ -162,12 +161,12 @@ mat Chain::update_M(mat& log_W, size_t& L, size_t& K, Theta& theta, Data& data, 
     for (int j = 0; j < J; ++j) {
         int k = S(j);
         for (int i = 0; i < *(observations + j); ++i) {
-            vec log_Wk;
-            log_Wk.set_size(L);
+            vec log_Wk(L, arma::fill::zeros);
             for (int l = 0; l < L; ++l) {
-                log_Wk(l) = log_W(l,k) + logLikelihood(data.get_vec(i,j), theta.get_mean(l), theta.get_cov(l));
+                log_Wk(l) = log_W(l,k) + logLikelihood(data.get_vec(j,i), theta.get_mean(l), theta.get_cov(l));
             }
             vec Wk = arma::exp(log_Wk);
+            Wk = arma::normalise(Wk, 1);
             std::default_random_engine generatore_random;
             discrete_distribution<int> Cat(Wk.begin(), Wk.end()); 
             M(i,j) = Cat(generatore_random);
