@@ -55,7 +55,7 @@ public:
     mat update_omega(mat& beta, mat M, size_t& L, size_t& K, vec& S);
     vec update_S(vec& S, vec& log_pi, mat& log_W, size_t& K, mat& M, size_t& J, size_t* observations);
     mat update_M(mat& log_W, size_t& L, size_t& K, Theta& theta, Data& data, vec& S, mat& M, size_t& N, size_t* observations);
-    Theta update_theta(); //da chiamare con R
+    Theta update_theta(Theta& theta); //da chiamare con R
 
 };
 
