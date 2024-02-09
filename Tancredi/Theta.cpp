@@ -14,20 +14,33 @@ Theta::Theta(size_t L, size_t v) : size_L(L), size_v(v){
 }
 
 Theta::~Theta(){
-    delete[] theta;
+    //delete[] theta;
 }
 
 void Theta::print(){
-
+    for (int l = 0; l < size_L; ++l) {
+        std::cout << "mean" << l << std::endl;
+        theta[l].mean.print();
+        std::cout << "covariance" << l <<  std::endl;
+        theta[l].covariance.print();
+    }
 }
 
-void Theta::set_mean(size_t& l, const vec& mu) {
+void Theta::set_mean(size_t l, const vec& mu) {
     theta[l].mean = mu;
 }
 
-void Theta::set_covariance(size_t& l, const mat& cov) {
+void Theta::set_m(size_t l, size_t s, double n) {
+    theta[l].mean[s] = n;
+}
+
+void Theta::set_covariance(size_t l, const mat& cov) {
     theta[l].covariance = cov;
-}   
+}
+
+void Theta::set_c(size_t l, size_t s, size_t r, double n) {
+    theta[l].covariance(s,r) = n;
+}
 
 size_t Theta::size(){
     return size_L;

@@ -28,14 +28,14 @@ private:
     mat beta; // (L x K) L := numero di OC (passato in input) x numero di DC
     mat log_W; // (L x K) scelto K, pesi per scegliere OC
     vec S; // (J x 1) assegna un DC ad ogni persona (J persone)
-    mat M; // (J x max(n_j)) assegna per ogni persona un OC ad ogni atomo di quella persona (J persone e n_j atomo per persona j)
+    mat M; // (max(n_j) x J) assegna per ogni persona un OC ad ogni atomo di quella persona (J persone e n_j atomo per persona j)
     Theta theta; // (L x 1) ogni elemento di Theta è uno degli atomi comuni a tutti i DC
 
 
 public:
 
     // Costruttore
-    Chain(const Dimensions& input_dim, const vec& input_alpha, const vec& input_beta, Data& input_data);
+    Chain(const Dimensions& input_dim, const vec& input_alpha, const mat& input_beta, Data& input_data);
 
     // Chain step
     void chain_step(void);
@@ -53,9 +53,10 @@ public:
     //Updates
     vec update_pi(vec& alpha, vec& S, size_t& K);
     mat update_omega(mat& beta, mat M, size_t& L, size_t& K, vec& S);
-    vec update_S(vec& log_pi, mat& log_W, size_t& K, mat& M, size_t& J, size_t* observations);
+    vec update_S(vec& S, vec& log_pi, mat& log_W, size_t& K, mat& M, size_t& J, size_t* observations);
     mat update_M(mat& log_W, size_t& L, size_t& K, Theta& theta, Data& data, vec& S, mat& M, size_t& N, size_t* observations);
-    Theta update_theta(); //da chiamare con R
+    Theta update_theta(Theta& theta); //da chiamare con R
+
 };
 
 // funzione per valutare la likelihood in un determinato punto multivariato
