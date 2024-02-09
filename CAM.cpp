@@ -1,5 +1,7 @@
 #include <armadillo>
 #include "CAM.h"
+#include <RInside.h>
+#include <Rcpp.h>
 
 using namespace arma;
 

@@ -16,6 +16,7 @@ int main() {
       }
       */
 
+
      for (size_t i = 0; i < J; i++)
      {
             for (size_t j = 0; j < observations[i]; j++)
