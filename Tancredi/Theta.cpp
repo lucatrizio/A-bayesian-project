@@ -9,7 +9,8 @@ Theta::Theta(size_t L, size_t v) : size_L(L), size_v(v){
 
     for (size_t l = 0; l < L; ++l) {
         theta[l].mean.set_size(v);
-        theta[l].covariance.set_size(v,v);      
+        theta[l].covariance.set_size(v,v); 
+        theta[l].DAG=arma::zeros<arma::mat>(v, v);
     }    
 }
 
@@ -23,6 +24,8 @@ void Theta::print(){
         theta[l].mean.print();
         std::cout << "covariance" << l <<  std::endl;
         theta[l].covariance.print();
+        std::cout << "DAG" << l <<  std::endl;
+        theta[l].DAG.print();
     }
 }
 
@@ -40,6 +43,10 @@ void Theta::set_covariance(size_t l, const mat& cov) {
 
 void Theta::set_c(size_t l, size_t s, size_t r, double n) {
     theta[l].covariance(s,r) = n;
+}
+
+void Theta::set_d(size_t l, size_t s, size_t r, double n) {
+    theta[l].DAG(s,r) = n;
 }
 
 size_t Theta::size(){
@@ -62,3 +69,6 @@ arma::mat Theta::get_cov(size_t i){
     return theta[i].covariance;
 }
 
+arma::mat Theta::get_DAG(size_t i){
+    return theta[i].DAG;
+}

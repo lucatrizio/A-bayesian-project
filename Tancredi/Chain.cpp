@@ -224,9 +224,6 @@ Theta Chain::update_theta(Theta &theta)
         arma_mu.slice(k) = arma::reshape(theta.get_mean(k), theta.get_size_v(), 1); // reshape the vector into a matrix and assign it to the slice
     }
 
-    // Output the cube (if desired)
-    std::cout << "Cube: \n"<< arma_mu << std::endl;
-
     // Create the cube
     arma::cube arma_sigma(theta.get_size_v(), theta.get_size_v(), theta.size());
 
@@ -236,12 +233,13 @@ Theta Chain::update_theta(Theta &theta)
         arma_sigma.slice(k) = theta.get_cov(k);
     }
 
-    // Output the cube (if desired)
-    std::cout << "Cube: \n" << arma_sigma << std::endl;
-
-
     // Create the third cube
-    arma::cube arma_A(theta.get_size_v(), theta.get_size_v(), theta.size(), arma::fill::zeros);
+    arma::cube arma_A(theta.get_size_v(), theta.get_size_v(), theta.size());
+
+     for (size_t k = 0; k < theta.size(); ++k)
+    {
+        arma_A.slice(k) = theta.get_DAG(k);
+    }
 
     int nLayers_mu = arma_mu.n_slices, nLayers_sigma = arma_sigma.n_slices, nLayers_A = arma_A.n_slices;
     int nRows_mu = arma_mu.n_rows, nRows_sigma = arma_sigma.n_rows, nRows_A = arma_A.n_rows;
@@ -314,8 +312,14 @@ Theta Chain::update_theta(Theta &theta)
         obs_in_OC(l) = arma::accu(M == l);
     }
 
-    // Define a vector
-    NumericVector n = NumericVector::create(2, 2, 2);
+    NumericVector n(obs_in_OC.n_elem);
+
+    // Copy the elements from the arma::vec to the Rcpp::NumericVector
+    for (size_t i = 0; i < obs_in_OC.n_elem; ++i) {
+        n[i] = obs_in_OC(i);
+    }
+
+    Rcpp::Rcout << n << std::endl;
 
     // Define an integer
     int L = theta.size();
@@ -338,46 +342,52 @@ Theta Chain::update_theta(Theta &theta)
     cols[1] = nCols_sigma;
     cols[2] = nCols_A;
 
-    //printR(R["result"], rows, cols);
     List result_list=R["result"];
 
     for (int l = 0; l < result_list.size(); ++l)
     {
         List layer_list = result_list[l];
-        std::cout << "Layer List " << l + 1 << ":" << std::endl;
 
         for (int k = 0; k < layer_list.size(); ++k)
         {
             if (l == 0)
             {
                 NumericVector layer = layer_list[k];
-                std::cout << "Layer " << k + 1 << ":" << std::endl;
 
                 for (int i = 0; i < rows[l]; ++i)
                 {
-                    std::cout << layer(i) << std::endl;
                     theta.set_m(k,i, layer(i));
                 }
-                std::cout << std::endl;
             }
-            else
+            else if(l==1)
             {
                 NumericMatrix layer = layer_list[k];
-                std::cout << "Layer " << k + 1 << ":" << std::endl;
 
                 for (int i = 0; i < rows[l]; ++i)
                 {
                     for (int j = 0; j < cols[l]; ++j)
                     {
-                        std::cout << layer(i, j) << " ";
                         theta.set_c(k, i, j, layer(i,j));
                     }
-                    std::cout << std::endl;
                 }
-                std::cout << std::endl;
             }
+            else
+            {
+                NumericMatrix layer = layer_list[k];
+
+                for (int i = 0; i < rows[l]; ++i)
+                {
+                    for (int j = 0; j < cols[l]; ++j)
+                    {
+                        theta.set_d(k, i, j, layer(i,j));
+                    }
+                }
+            }
+            
         }
     }
+
+    theta.print();
 
     return theta;
 }

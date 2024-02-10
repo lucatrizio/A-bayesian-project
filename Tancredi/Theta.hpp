@@ -18,6 +18,7 @@ struct Parameters
 {
     vec mean;
     mat covariance;
+    mat DAG;
 };
 
 class Theta{
@@ -38,6 +39,7 @@ public:
     void set_m(size_t l, size_t s, double n);
     void set_covariance(size_t l, const mat& cov);
     void set_c(size_t l, size_t s, size_t r, double n);
+    void set_d(size_t l, size_t s, size_t r, double n);
 
     size_t size();
 
@@ -48,6 +50,8 @@ public:
     vec get_mean(size_t i);
 
     mat get_cov(size_t i);
+
+    mat get_DAG(size_t i);
 };
 
 
