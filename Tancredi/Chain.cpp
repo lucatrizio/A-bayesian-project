@@ -311,8 +311,8 @@ Theta Chain::update_theta(Theta &theta)
     NumericVector n = NumericVector::create(2, 2, 2);
 
     // Define an integer
-    int L = 3;
-    int q = 2;
+    int L = theta.size();
+    int q = theta.get_size_v();
     // Pass the vector and integer to R
     R["n"] = n;
     R["L"] = L;
