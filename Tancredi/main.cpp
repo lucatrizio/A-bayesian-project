@@ -51,7 +51,7 @@ int main() {
       Dimensions dim = Dimensions {J, K, L, v, observations, max_N};
 
       // Parametri per generare le Dirichlet
-      double forma_beta = 10.0;
+      double forma_beta = 1.0;
       double scala = 1.06;
 
       // Prior hyperparameters per le dirichlet
