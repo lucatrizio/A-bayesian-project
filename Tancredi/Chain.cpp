@@ -239,7 +239,7 @@ Theta Chain::update_theta(Theta &theta)
 
 
     // Create the third cube
-    arma::cube arma_A(2, 2, 3, arma::fill::zeros);
+    arma::cube arma_A(3, 3, 3, arma::fill::zeros);
 
     int nLayers_mu = arma_mu.n_slices, nLayers_sigma = arma_sigma.n_slices, nLayers_A = arma_A.n_slices;
     int nRows_mu = arma_mu.n_rows, nRows_sigma = arma_sigma.n_rows, nRows_A = arma_A.n_rows;

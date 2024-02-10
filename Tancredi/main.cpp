@@ -60,7 +60,7 @@ int main() {
       mat beta = arma::repmat(beta_col, 1, K);
       // Esempio di catena
       Chain catena_example = Chain(dim, alpha, beta, field_example);
-      size_t B = 1000;
+      size_t B = 1;
       catena_example.print();
       for (size_t b = 0; b < B; ++b) {
             catena_example.chain_step();  
