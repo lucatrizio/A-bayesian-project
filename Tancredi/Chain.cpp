@@ -33,6 +33,7 @@ void Chain::chain_step(void) {
         // UPDATE OMEGA (prima aggiorno i pesi poi i nuovi valori di omega)
         beta = update_omega(beta, M, dim.L, dim.K, S);
         log_W  = draw_log_W(beta, dim.K);
+
         // UPDATE M (prima aggiorno i pesi e poi i nuovi valori di M)
         M = update_M(log_W, dim.L, dim.K, theta, data, S, M, dim.max_N, data.get_observationsFor());
     
@@ -81,7 +82,8 @@ vec Chain::draw_S(vec& log_pi, size_t& J) {
 mat Chain::draw_M(mat& log_W, vec& S, size_t* N, size_t& J, size_t& max_N)  {
     mat w = arma::exp(log_W);
     mat M;
-    M.zeros(max_N, J);
+    M.ones(max_N, J);
+    M = M * (-1);
     std::default_random_engine generatore_random;
     for (int j = 0; j < J; ++j) {
         discrete_distribution<int> Cat_w(w.col(S(j)).begin(), w.col(S(j)).end());
@@ -152,7 +154,7 @@ vec Chain::update_S(vec& S, vec& log_pi, mat& log_W, size_t& K, mat& M, size_t& 
 
 double logLikelihood(const vec& x, const vec& mean, const mat& covariance) {
     int dim = x.size();
-    double expTerm = -0.5 * as_scalar(trans(x - mean) * inv(covariance) * (x - mean));
+    double expTerm = -0.5 * as_scalar(trans(x - mean) * arma::inv(covariance) * (x - mean));
     double normalization = -0.5 * dim * log(2.0 * M_PI) - 0.5 * log(det(covariance));
     double logLik = normalization + expTerm;
     return logLik;
