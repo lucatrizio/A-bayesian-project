@@ -23,67 +23,20 @@ int main() {
       */
 
 
-     for (size_t i = 0; i < J; i++)
+     for (size_t j = 0; j < J; j++)
      {
-            for (size_t j = 0; j < observations[i]; j++)
-            {
-                  for (size_t k = 0; k < v; k++)
-                  {     
-                        vec vet(v,arma::fill::randu);
-                        field_example.set_vec(i,j, vet);
+            for (size_t i = 0; i < observations[j]; i++) { 
+                  vec vet(v, arma::fill::randn);
+                  if (j%2 == 0) {
+                        vet = vet + 5;
                   }
-                  
-            }
-            
+                  if (j%3 == 0) {
+                        vet = vet + 15;
+                  }
+                  field_example.set_vec(j,i, vet);
+            }    
      }
-     
-
-
-
-
-
-      // Apri il file CSV in modalità lettura
-      ifstream file("data.CSV");
-
-      // Verifica se il file è stato aperto correttamente
-      if (!file.is_open()) {
-            cerr << "Errore nell'apertura del file CSV." << endl;
-            return 1;
-      }
-
-      // Dichiarazione di variabili per la lettura del file
-      string line, token;
-      vector<vector<string>> csv; // Struttura dati per memorizzare i dati CSV
-
-      // Leggi il file riga per riga
-      while (getline(file, line)) {
-            stringstream ss(line);
-            vector<string> row; // Vettore per memorizzare i dati di ogni riga
-
-            // Estrai i token dalla riga utilizzando una virgola come delimitatore
-            while (getline(ss, token, ',')) {
-                  row.push_back(token);
-            }
-
-            // Aggiungi la riga al vettore dei dati
-            csv.push_back(row);
-      }
-
-      // Chiudi il file dopo aver letto i dati
-      file.close();
-
-      // Ora puoi utilizzare il vettore "data" per accedere ai dati CSV
-
-      // Esempio di come stampare i dati
-      for (const auto& row : csv) {
-            for (const auto& value : row) {
-                  cout << value << " ";
-            }
-            cout << endl;
-            cout << "nuova riga" << endl;
-      }
-
-
+     field_example.print();
 
 
       //int n_j = field_example.n_cols; //numero di atomi, va cambiato quando non saranno tutti uguali (magari non saranno neanche tutti uguali)
@@ -108,9 +61,11 @@ int main() {
       // Esempio di catena
       Chain catena_example = Chain(dim, alpha, beta, field_example);
       size_t B = 1000;
+      catena_example.print();
       for (size_t b = 0; b < B; ++b) {
             catena_example.chain_step();  
       }
+      catena_example.print();
       // Stampiamo le prior create
       return 0;
 }
