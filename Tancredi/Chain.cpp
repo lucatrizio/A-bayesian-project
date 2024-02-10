@@ -83,7 +83,7 @@ mat Chain::draw_M(mat& log_W, vec& S, size_t* N, size_t& J, size_t& max_N)  {
     mat w = arma::exp(log_W);
     mat M;
     M.ones(max_N, J);
-    M = M * (-1);
+    M=M*(-1);
     std::default_random_engine generatore_random;
     for (int j = 0; j < J; ++j) {
         discrete_distribution<int> Cat_w(w.col(S(j)).begin(), w.col(S(j)).end());
@@ -241,7 +241,7 @@ Theta Chain::update_theta(Theta &theta)
 
 
     // Create the third cube
-    arma::cube arma_A(3, 3, 3, arma::fill::zeros);
+    arma::cube arma_A(theta.get_size_v(), theta.get_size_v(), theta.size(), arma::fill::zeros);
 
     int nLayers_mu = arma_mu.n_slices, nLayers_sigma = arma_sigma.n_slices, nLayers_A = arma_A.n_slices;
     int nRows_mu = arma_mu.n_rows, nRows_sigma = arma_sigma.n_rows, nRows_A = arma_A.n_rows;
