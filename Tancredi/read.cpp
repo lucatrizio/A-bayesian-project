@@ -3,12 +3,13 @@
 #include <sstream>
 #include <vector>
 #include <string>
+#include <armadillo>
 
 using namespace std;
 
-int main() {
+arma::mat main() {
     // Apri il file CSV in modalità lettura
-    ifstream file("data.CSV");
+    ifstream file("test_data.csv");
 
     // Verifica se il file è stato aperto correttamente
     if (!file.is_open()) {
@@ -37,15 +38,13 @@ int main() {
     // Chiudi il file dopo aver letto i dati
     file.close();
 
-    // Ora puoi utilizzare il vettore "data" per accedere ai dati CSV
+    arma::mat armaMatrix(data.size(), data[0].size());
 
-    // Esempio di come stampare i dati
-    for (const auto& row : data) {
-        for (const auto& value : row) {
-            cout << value << " ";
+    for (size_t i = 0; i < data.size(); ++i) {
+        for (size_t j = 0; j < data[0].size(); ++j) {
+            armaMatrix(i, j) = stod(data[i][j]);
         }
-        cout << endl;
     }
 
-    return 0;
+    return armaMatrix;
 }

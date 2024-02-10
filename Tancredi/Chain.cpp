@@ -309,6 +309,11 @@ Theta Chain::update_theta(Theta &theta)
     R["sigma_mat"] = Rcpp_sigma;
     R["A_mat"] = Rcpp_A;
 
+    vec obs_in_OC(dim.L, arma::fill::zeros);
+    for (size_t l = 0; l < dim.L; ++l) {
+        obs_in_OC(l) = arma::accu(M == l);
+    }
+
     // Define a vector
     NumericVector n = NumericVector::create(2, 2, 2);
 

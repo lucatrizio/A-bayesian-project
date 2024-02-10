@@ -54,5 +54,5 @@ for (j in 1:J){
 }
 
 #save as an excell
-write.xlsx(data, "test_data.xlsx")
+write.csv(data, file = "test_data.csv", row.names = FALSE)
 
