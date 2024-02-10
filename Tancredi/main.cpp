@@ -22,18 +22,14 @@ int main() {
       }
       */
      mat csv = read();
-
+     size_t u = 1;
      for (size_t j = 0; j < J; j++)
      {
             for (size_t i = 0; i < observations[j]; i++) { 
-                  vec vet(v, arma::fill::randn);
-                  if (j%2 == 0) {
-                        vet = vet + 5;
-                  }
-                  if (j%3 == 0) {
-                        vet = vet + 15;
-                  }
-                  field_example.set_vec(j,i, vet);
+                  vec vet = csv.row(u);
+                  u++;
+                  vec subvec = vet.subvec(1,3);
+                  field_example.set_vec(j,i, subvec);
             }    
      }
      field_example.print();
