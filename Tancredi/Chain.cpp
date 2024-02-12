@@ -9,11 +9,11 @@
 
 
 
-Chain::Chain(const Dimensions& input_dim, const vec& input_alpha, const mat& input_beta, Data& input_data, int argc, char *argv[]): dim(input_dim), alpha(input_alpha), beta(input_beta), data(input_data), theta(dim.L, dim.v), R(argc, argv) {
+Chain::Chain(const Dimensions& input_dim, const vec& input_alpha, const mat& input_beta, Data& input_data, int argc, char *argv[]): dim(input_dim), alpha0(input_alpha), beta0(input_beta), data(input_data), theta(dim.L, dim.v), R(argc, argv) {
 
     // Generazione dei pesi pi e w
-    log_pi = draw_log_pi(alpha); // genera i pesi per DC dalla Dirichlet
-    log_W = draw_log_W(beta, dim.K);
+    log_pi = draw_log_pi(alpha0); // genera i pesi per DC dalla Dirichlet
+    log_W = draw_log_W(beta0, dim.K);
 
     // Generazione delle variabili categoriche S e M
     S = draw_S(log_pi, dim.J);
@@ -26,7 +26,7 @@ Chain::Chain(const Dimensions& input_dim, const vec& input_alpha, const mat& inp
 void Chain::chain_step(void) {
     //UPDATE DISTRIBUTIONAL CLUSTERS
         // UPDATE PI (prima aggiorno i pesi e poi i nuovi valori di pi)
-        alpha = update_pi(alpha0, S, dim.K);
+        vec alpha = update_pi(alpha0, S, dim.K);
         log_pi = draw_log_pi(alpha);
 
         S = update_S(S, log_pi, log_W, dim.K, M, dim.J, data.get_observationsFor());
@@ -34,7 +34,7 @@ void Chain::chain_step(void) {
 
     // UPDATE OBSERVATIONAL CLUSTERS
         // UPDATE OMEGA (prima aggiorno i pesi poi i nuovi valori di omega)
-        beta = update_omega(beta, M, dim.L, dim.K, S);
+        mat beta = update_omega(beta0, M, dim.L, dim.K, S);
         log_W  = draw_log_W(beta, dim.K);
 
         // UPDATE M (prima aggiorno i pesi e poi i nuovi valori di M)
@@ -49,7 +49,7 @@ void Chain::chain_step(void) {
 
 void Chain::print(void) {
     cout << "pi:\n" << arma::normalise(arma::exp(log_pi),1) << endl;
-    cout << "w:\n" << arma::normalise(arma::exp(log_W),1, 1) << endl;
+    cout << "w:\n" << arma::normalise(arma::exp(log_W),1, 0) << endl;
     cout << "S:\n" << S << endl;
     cout << "M:\n" << M << endl;
     theta.print();
@@ -60,16 +60,12 @@ vec Chain::draw_log_pi(vec& alpha) {
     return arma::log(pi);
 };
 
-// CONTROLLARE CHE NON RIUTILIZZI BETA PRECEDENTE MA SOLO IL PRIMO STESSA COS
-
-
-// NORMALIZZARE?
-// CONTROLLARE JOIN-ROWS (COLS ?)
+// NORMALIZZARE? a posto in teoria
 mat Chain::draw_log_W(mat& beta, size_t& K) {
     mat log_W;
     for (int k = 0; k < K; k++) {
-        vec log_w_k = arma::log(generateDirichlet(beta.col(k))); //genera un vettore dalla dirichlet per ogni k
-        log_W = arma::join_rows(log_W, log_w_k); // costruisce la matrice dei pesi aggiungendo ogni colonna
+        vec log_Wk = arma::log(generateDirichlet(beta.col(k))); //genera un vettore dalla dirichlet per ogni k
+        log_W = arma::join_rows(log_W, log_Wk); // costruisce la matrice dei pesi aggiungendo ogni colonna
     }
     return log_W;
 };
@@ -226,6 +222,22 @@ mat generateRandomMatrix(int degreesOfFreedom, const mat& scaleMatrix) {
 
 Theta Chain::update_theta(Theta &theta)
 {
+    vec** data_per_cluster = {nullptr};
+    data_per_cluster = new vec*[dim.L];
+    for (size_t l = 0; l < dim.L; l++) {
+        std::cout << " ========= " << "M" << " ===========" << std::endl;
+        M.print();
+        uvec indeces = arma::find(M == l);
+        std::cout << " ========= " << l << " ===========" << std::endl;
+        indeces.print();
+        data_per_cluster[l] = new vec[indeces.size()];
+        for (size_t i = 0; i < indeces.size(); i++) {
+            data_per_cluster[l][i] = data.get_vec(indeces(i) / dim.max_N, indeces(i) % dim.max_N);
+        }
+        for (size_t i = 0; i < indeces.size(); i++) {
+            std::cout << data_per_cluster[l][i] << std::endl;
+        }
+    }
     
     using namespace Rcpp;
 
