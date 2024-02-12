@@ -7,7 +7,9 @@
 #include <Rcpp.h>
 #include <armadillo>
 
-Chain::Chain(const Dimensions& input_dim, const vec& input_alpha, const mat& input_beta, Data& input_data) : dim(input_dim), alpha(input_alpha), beta(input_beta), data(input_data), theta(dim.L, dim.v) {
+
+
+Chain::Chain(const Dimensions& input_dim, const vec& input_alpha, const mat& input_beta, Data& input_data, int argc, char *argv[]): dim(input_dim), alpha(input_alpha), beta(input_beta), data(input_data), theta(dim.L, dim.v), R(argc, argv) {
 
     // Generazione dei pesi pi e w
     log_pi = draw_log_pi(alpha); // genera i pesi per DC dalla Dirichlet
@@ -24,10 +26,11 @@ Chain::Chain(const Dimensions& input_dim, const vec& input_alpha, const mat& inp
 void Chain::chain_step(void) {
     //UPDATE DISTRIBUTIONAL CLUSTERS
         // UPDATE PI (prima aggiorno i pesi e poi i nuovi valori di pi)
-        alpha = update_pi(alpha, S, dim.K);
+        alpha = update_pi(alpha0, S, dim.K);
         log_pi = draw_log_pi(alpha);
 
         S = update_S(S, log_pi, log_W, dim.K, M, dim.J, data.get_observationsFor());
+
 
     // UPDATE OBSERVATIONAL CLUSTERS
         // UPDATE OMEGA (prima aggiorno i pesi poi i nuovi valori di omega)
@@ -36,18 +39,20 @@ void Chain::chain_step(void) {
 
         // UPDATE M (prima aggiorno i pesi e poi i nuovi valori di M)
         M = update_M(log_W, dim.L, dim.K, theta, data, S, M, dim.max_N, data.get_observationsFor());
-    
+
     // UPDATE PARAMETERS
         // UPDATE THETA (da chiamare su R)
-        theta = update_theta(theta);
+        theta = update_theta(theta); // PROVA CON NIW PER VEDERE SE FUNZIONA
+
 
 }
 
 void Chain::print(void) {
-    cout << "pi:\n" << arma::exp(log_pi) << endl;
-    cout << "w:\n" << arma::exp(log_W) << endl;
+    cout << "pi:\n" << arma::normalise(arma::exp(log_pi),1) << endl;
+    cout << "w:\n" << arma::normalise(arma::exp(log_W),1, 1) << endl;
     cout << "S:\n" << S << endl;
     cout << "M:\n" << M << endl;
+    theta.print();
 }
 
 vec Chain::draw_log_pi(vec& alpha) {
@@ -55,7 +60,11 @@ vec Chain::draw_log_pi(vec& alpha) {
     return arma::log(pi);
 };
 
+// CONTROLLARE CHE NON RIUTILIZZI BETA PRECEDENTE MA SOLO IL PRIMO STESSA COS
 
+
+// NORMALIZZARE?
+// CONTROLLARE JOIN-ROWS (COLS ?)
 mat Chain::draw_log_W(mat& beta, size_t& K) {
     mat log_W;
     for (int k = 0; k < K; k++) {
@@ -137,9 +146,9 @@ vec Chain::update_S(vec& S, vec& log_pi, mat& log_W, size_t& K, mat& M, size_t& 
     for (int j = 0; j < J; ++j){
         vec log_P(K,arma::fill::zeros);
         for (int k = 0; k < K; ++k) {
-            float log_Pk = 0;
+            float log_Pk = log_pi(k);
                 for (int i = 0; i < *(observations + j); ++i) {
-                    log_Pk += log_W(M(i,j),k) + log_pi(k);
+                    log_Pk += log_W(M(i,j),k);
                 }
             log_P(k) = log_Pk;
         }
@@ -167,11 +176,20 @@ mat Chain::update_M(mat& log_W, size_t& L, size_t& K, Theta& theta, Data& data, 
         int k = S(j);
         for (int i = 0; i < *(observations + j); ++i) {
             vec log_Wk(L, arma::fill::zeros);
+            for (size_t l = 0; l < L; ++l) {
+                log_Wk(l) = log_W(l,k);
+            }
             for (int l = 0; l < L; ++l) {
-                log_Wk(l) = log_W(l,k) + logLikelihood(data.get_vec(j,i), theta.get_mean(l), theta.get_cov(l));
+                log_Wk(l) += logLikelihood(data.get_vec(j,i), theta.get_mean(l), theta.get_cov(l));
             }
             vec Wk = arma::exp(log_Wk);
             Wk = arma::normalise(Wk, 1);
+            /*
+            std::cout << "==========" << std::endl;
+            std::cout << "Wk vector for:(" <<i<<", "<<j<< ") " <<std::endl;
+            Wk.print();
+            std::cout << "==========" << std::endl;
+            */
             std::default_random_engine generatore_random;
             discrete_distribution<int> Cat(Wk.begin(), Wk.end()); 
             M(i,j) = Cat(generatore_random);
@@ -208,14 +226,14 @@ mat generateRandomMatrix(int degreesOfFreedom, const mat& scaleMatrix) {
 
 Theta Chain::update_theta(Theta &theta)
 {
+    
     using namespace Rcpp;
 
-    int argc = 1;
-    char *argv[] = { nullptr }; // create a temporary argv array
-
-    RInside R(argc, argv); // Initialize RInside inside the function
+ // Initialize RInside inside the function
+    
 
     // Create an arma::cube to hold the arrays
+
     arma::cube arma_mu(theta.get_size_v(), 1, theta.size());
 
     // Gather arrays from the matrices into the cube
@@ -245,9 +263,9 @@ Theta Chain::update_theta(Theta &theta)
     int nRows_mu = arma_mu.n_rows, nRows_sigma = arma_sigma.n_rows, nRows_A = arma_A.n_rows;
     int nCols_mu = arma_mu.n_cols, nCols_sigma = arma_sigma.n_cols, nCols_A = arma_A.n_cols;
 
-    Rcpp::Rcout << arma_mu << std::endl;
-    Rcpp::Rcout << arma_sigma << std::endl;
-    Rcpp::Rcout << arma_A << std::endl;
+    // Rcpp::Rcout << arma_mu << std::endl;
+    // Rcpp::Rcout << arma_sigma << std::endl;
+    // Rcpp::Rcout << arma_A << std::endl;
 
     // Create lists to represent the cubes
     List Rcpp_mu(nLayers_mu);
@@ -321,6 +339,7 @@ Theta Chain::update_theta(Theta &theta)
 
     Rcpp::Rcout << n << std::endl;
 
+
     // Define an integer
     int L = theta.size();
     int q = theta.get_size_v();
@@ -330,10 +349,9 @@ Theta Chain::update_theta(Theta &theta)
     R["q"] = q;
 
     R.parseEvalQ("source('mixture_dag.R')");
-    R.parseEvalQ("result <- mixture_dags(mu_mat, sigma_mat, A_mat, L, q, n)");
+    R.parseEvalQ("result <- mixture_dags(mu_mat, sigma_mat, A_mat, L, q, n)"); // AGGIUNGERE Y E MATRICE M DEGLI OBS CLUSTERS (OPPURE I DATI GIA DIVISI PER CLUSTER)
 
     // Retrieve and print the result cube
-
     size_t rows[3], cols[3];
     rows[0] = nRows_mu;
     rows[1] = nRows_sigma;
@@ -387,7 +405,7 @@ Theta Chain::update_theta(Theta &theta)
         }
     }
 
-    theta.print();
+    // theta.print();
 
     return theta;
 }

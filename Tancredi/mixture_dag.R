@@ -4,9 +4,9 @@ mixture_dags=function(mu_mat,Sigma_mat,A_mat,L,q,n){
   sink("output.txt")
   
   # Print the value of the variable
-  print(mu_mat)
-  print(Sigma_mat)
-  print(A_mat)
+  #print(mu_mat)
+  #print(Sigma_mat)
+  #print(A_mat)
   
   # Stop redirecting output
   sink()
@@ -48,7 +48,7 @@ mixture_dags=function(mu_mat,Sigma_mat,A_mat,L,q,n){
      type.op    = move_star$type.operator
      nodes_star = move_star$nodes
      
-     X_k=Sigma_chain[,,k]
+     X_k=Sigma_chain[,,k] # CAMBIARE X_K CON I DATI CHE CADONO NEL CLUSTER K(?)
      #n_k =numero di osservazioni che cadono nel cluster osservazionale i=1,...,L
      n_k=n[k]
      x_bar  = colMeans(X_k)
