@@ -24,8 +24,8 @@ void Theta::print(){
         theta[l].mean.print();
         std::cout << "covariance" << l <<  std::endl;
         theta[l].covariance.print();
-        //std::cout << "DAG" << l <<  std::endl;
-        //theta[l].DAG.print();
+        std::cout << "DAG" << l <<  std::endl;
+        theta[l].DAG.print();
     }
 }
 

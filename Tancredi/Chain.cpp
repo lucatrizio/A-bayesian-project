@@ -9,53 +9,39 @@
 
 
 
-Chain::Chain(const Dimensions& input_dim, const vec& input_alpha, const mat& input_beta, Data& input_data, int argc, char *argv[]): dim(input_dim), alpha(input_alpha), beta(input_beta), data(input_data), theta(dim.L, dim.v), R(argc, argv) {
+Chain::Chain(const Dimensions& input_dim, const vec& input_alpha, const mat& input_beta, Data& input_data, int argc, char *argv[]): dim(input_dim), alpha(input_alpha), beta(input_beta), data(input_data), theta(dim.L, dim.v), R(argc, argv), log_W(input_dim.L, input_dim.K), S(input_dim.J), M(input_dim.max_N, input_dim.J){
 
     // Generazione dei pesi pi e w
-    vec log_pi(dim.K);
     draw_log_pi(alpha); // genera i pesi per DC dalla Dirichlet
-    mat log_W(dim.L, dim.K);
     draw_log_W(beta);
-
     // Generazione delle variabili categoriche S e M
-    vec S;
     draw_S();
-    mat M;
-    M.ones(dim.max_N, dim.J);
-    M=M*(-1);
+
+    M.fill(-1);
     draw_M();
 
     // Generazione dei parametri theta
-    Theta theta(dim.L,dim.v);
     draw_theta();
 }
 
 void Chain::chain_step(void) {
     //UPDATE DISTRIBUTIONAL CLUSTERS
         // UPDATE PI (prima aggiorno i pesi e poi i nuovi valori di pi)
-        vec alpha = update_pi(alpha0, S, dim.K);
-        log_pi = draw_log_pi(alpha);
-        alpha = update_pi();
-        draw_log_pi(alpha);
-
-        S = update_S();
+        vec alpha_post = update_pi();
+        draw_log_pi(alpha_post);
+        update_S();
 
 
     // UPDATE OBSERVATIONAL CLUSTERS
         // UPDATE OMEGA (prima aggiorno i pesi poi i nuovi valori di omega)
-        mat beta = update_omega(beta0, M, dim.L, dim.K, S);
-        log_W  = draw_log_W(beta, dim.K);
-        beta = update_omega();
-        draw_log_W(beta);
+        mat beta_post = update_omega();
+        draw_log_W(beta_post);
 
         // UPDATE M (prima aggiorno i pesi e poi i nuovi valori di M)
         update_M();
 
     // UPDATE PARAMETERS
-        // UPDATE THETA (da chiamare su R)
         update_theta(); // PROVA CON NIW PER VEDERE SE FUNZIONA
-
-
 }
 
 void Chain::print(void) {
@@ -63,7 +49,9 @@ void Chain::print(void) {
     cout << "w:\n" << arma::normalise(arma::exp(log_W),1, 0) << endl;
     cout << "S:\n" << S << endl;
     cout << "M:\n" << M << endl;
-    theta.print();
+    cout << "alpha:\n" << alpha << endl;
+    cout << "Beta:\n" << beta << endl;
+    // theta.print();
 }
 
 void Chain::draw_log_pi(vec& alpha) {
@@ -74,9 +62,7 @@ void Chain::draw_log_pi(vec& alpha) {
 // CONTROLLARE CHE NON RIUTILIZZI BETA PRECEDENTE MA SOLO IL PRIMO STESSA COS
 
 
-// NORMALIZZARE?
-// CONTROLLARE JOIN-ROWS (COLS ?)
-void Chain::draw_log_W(mat beta) {
+void Chain::draw_log_W(mat& beta) {
     for (int k = 0; k < dim.K; k++) {
         vec log_w_k = arma::log(generateDirichlet(beta.col(k))); //genera un vettore dalla dirichlet per ogni k
         log_W.col(k) = log_w_k; // costruisce la matrice dei pesi aggiungendo ogni colonna
@@ -91,7 +77,6 @@ void Chain::draw_S(void) {
     for (int j = 0; j < dim.J; j++) {
         S(j) = Cat(generatore_random);
     }
-    return S;
 };
 
 void Chain::draw_M(void)  {
@@ -107,7 +92,7 @@ void Chain::draw_M(void)  {
 
 void Chain::draw_theta(void) {
     // estrai da una NIW
-    v = dim.v
+    size_t v = dim.v;
     vec mean0(v, arma::fill::randu);  // Vettore delle medie con valori casuali
     mat cov0 = arma::eye<arma::mat>(v, v);  // Matrice di covarianza come matrice identità
     mat scale_mat = 0.1 * arma::eye<arma::mat>(v, v);  // Matrice di scala come 0.1 * matrice identità
@@ -122,33 +107,33 @@ void Chain::draw_theta(void) {
 };
 
 vec Chain::update_pi(void) {
-    vec alpha(dim.K)
-    for (int k = 0; k < dim.K; ++k) {
-        alpha(k) = alpha0(k) + arma::accu(S == k);
+    vec alpha_post(dim.K);
+    for (size_t k = 0; k < dim.K; ++k) {
+        alpha_post(k) = alpha(k) + arma::accu(S == k);
     }
-    return alpha;
+    return alpha_post;
 };
 
 
 mat Chain::update_omega(void) {
-    mat beta(dim.L, dim.K)
-    for (int k = 0; k < dim.K; ++k) {
-        for (int l = 0; l < dim.L; ++l) {
+    mat beta_post = beta;
+    for (size_t k = 0; k < dim.K; ++k) {
+        for (size_t l = 0; l < dim.L; ++l) {
             arma::mat Mk = M.cols(arma::find(S == k));
-            beta(l,k) += arma::accu(Mk == l);
+            beta_post(l,k) += arma::accu(Mk == l);
         }
     }
-    return beta;
+    return beta_post;
 };
 
 void Chain::update_S(void) { // guarda se funziona mettendo il log, senno integra via M
     std::default_random_engine generatore_random;
-    size_t* observations = data.get_observationsFor()
-    for (int j = 0; j < dim.J; ++j){
-        vec log_P(K,arma::fill::zeros);
-        for (int k = 0; k < K; ++k) {
+    size_t* observations = data.get_observationsFor();
+    for (size_t j = 0; j < dim.J; ++j){
+        vec log_P(dim.K,arma::fill::zeros);
+        for (size_t k = 0; k < dim.K; ++k) {
             float log_Pk = log_pi(k);
-                for (int i = 0; i < *(observations + j); ++i) {
+                for (size_t i = 0; i < *(observations + j); ++i) {
                     log_Pk += log_W(M(i,j),k);
                 }
             log_P(k) = log_Pk;
@@ -172,25 +157,19 @@ double logLikelihood(const vec& x, const vec& mean, const mat& covariance) {
 
 void Chain::update_M(void) {
     int J = dim.J;
-    size_t* observations = data.get_observationsFor()
-    for (int j = 0; j < J; ++j) {
-        int k = S(j);
-        for (int i = 0; i < *(observations + j); ++i) {
-            vec log_Wk(L, arma::fill::zeros);
+    size_t* observations = data.get_observationsFor();
+    for (size_t j = 0; j < J; ++j) {
+        size_t k = S(j);
+        for (size_t i = 0; i < *(observations + j); ++i) {
+            vec log_Wk(dim.L, arma::fill::zeros);
             for (size_t l = 0; l < dim.L; ++l) {
                 log_Wk(l) = log_W(l,k);
             }
-            for (int l = 0; l < L; ++l) {
+            for (size_t l = 0; l < dim.L; ++l) {
                 log_Wk(l) += logLikelihood(data.get_vec(j,i), theta.get_mean(l), theta.get_cov(l));
             }
             vec Wk = arma::exp(log_Wk);
             Wk = arma::normalise(Wk, 1);
-            /*
-            std::cout << "==========" << std::endl;
-            std::cout << "Wk vector for:(" <<i<<", "<<j<< ") " <<std::endl;
-            Wk.print();
-            std::cout << "==========" << std::endl;
-            */
             std::default_random_engine generatore_random;
             discrete_distribution<int> Cat(Wk.begin(), Wk.end()); 
             M(i,j) = Cat(generatore_random);
@@ -229,17 +208,10 @@ void Chain::update_theta(void)
     vec** data_per_cluster = {nullptr};
     data_per_cluster = new vec*[dim.L];
     for (size_t l = 0; l < dim.L; l++) {
-        std::cout << " ========= " << "M" << " ===========" << std::endl;
-        M.print();
         uvec indeces = arma::find(M == l);
-        std::cout << " ========= " << l << " ===========" << std::endl;
-        indeces.print();
         data_per_cluster[l] = new vec[indeces.size()];
         for (size_t i = 0; i < indeces.size(); i++) {
             data_per_cluster[l][i] = data.get_vec(indeces(i) / dim.max_N, indeces(i) % dim.max_N);
-        }
-        for (size_t i = 0; i < indeces.size(); i++) {
-            std::cout << data_per_cluster[l][i] << std::endl;
         }
     }
     

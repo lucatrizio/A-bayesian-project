@@ -25,9 +25,9 @@ class Chain{
 private:
     Data data; //input
     Dimensions dim; //input
-    vec alpha0; // (K x 1) K:= numero di DC (passato in input)
+    vec alpha; // (K x 1) K:= numero di DC (passato in input)
     vec log_pi; // (K x 1) pesi per scegliere DC
-    mat beta0; // (L x K) L := numero di OC (passato in input) x numero di DC
+    mat beta; // (L x K) L := numero di OC (passato in input) x numero di DC
     mat log_W; // (L x K) scelto K, pesi per scegliere OC
     vec S; // (J x 1) assegna un DC ad ogni persona (J persone)
     mat M; // (max(n_j) x J) assegna per ogni persona un OC ad ogni atomo di quella persona (J persone e n_j atomo per persona j)

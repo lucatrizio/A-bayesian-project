@@ -69,7 +69,7 @@ int main() {
                 u++;
             }    
      }
-     // field_example.print();
+     //field_example.print();
 
       // SE NON 
       //int n_j = field_example.n_cols; //numero di atomi, va cambiato quando non saranno tutti uguali (magari non saranno neanche tutti uguali)
@@ -92,13 +92,15 @@ int main() {
       vec beta_col = arma::randg<vec>(dim.L, arma::distr_param(forma_beta, scala));
       mat beta = arma::repmat(beta_col, 1, K);
       // Esempio di catena
+
       Chain catena_example = Chain(dim, alpha, beta, field_example);
-      size_t B = 1;
-      //catena_example.print();
+      size_t B = 10;
+      catena_example.print();
       //std::cout << "prima " <<std::endl; 
       for (size_t b = 0; b < B; ++b) {
-            std::cout << b << std::endl;
+            std::cout << " ============== ITER " << b << " ==================" << std::endl;
             catena_example.chain_step();  
+            catena_example.print();
       }
       //std::cout << "dopo " <<std::endl; 
       //catena_example.print();
