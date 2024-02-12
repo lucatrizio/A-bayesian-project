@@ -46,18 +46,18 @@ public:
     void print(void);
 
     //Draws
-    vec draw_log_pi(vec& alpha);
-    mat draw_log_W(mat& beta, size_t& K);
-    vec draw_S(vec& log_pi, size_t& J);
-    mat draw_M(mat& log_W, vec& S, size_t* N, size_t& J, size_t& max_N);
-    Theta draw_theta(size_t& L, size_t& v);
+    void draw_log_pi(vec& alpha);
+    void draw_log_W(mat& beta);
+    void draw_S(void);
+    void draw_M(void);
+    void draw_theta(void);
 
     //Updates
-    vec update_pi(vec& alpha, vec& S, size_t& K);
-    mat update_omega(mat& beta, mat M, size_t& L, size_t& K, vec& S);
-    vec update_S(vec& S, vec& log_pi, mat& log_W, size_t& K, mat& M, size_t& J, size_t* observations);
-    mat update_M(mat& log_W, size_t& L, size_t& K, Theta& theta, Data& data, vec& S, mat& M, size_t& N, size_t* observations);
-    Theta update_theta(Theta& theta); //da chiamare con R
+    vec update_pi(void);
+    mat update_omega(void);
+    void update_S(void);
+    void update_M(void);
+    void update_theta(void); //da chiamare con R
 
 };
 
