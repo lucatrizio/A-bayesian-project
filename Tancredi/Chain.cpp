@@ -9,40 +9,47 @@
 
 
 
-Chain::Chain(const Dimensions& input_dim, const vec& input_alpha, const mat& input_beta, Data& input_data, int argc, char *argv[]): dim(input_dim), alpha(input_alpha), beta(input_beta), data(input_data), theta(dim.L, dim.v), R(argc, argv) {
+Chain::Chain(const Dimensions& input_dim, const vec& input_alpha, const mat& input_beta, Data& input_data, int argc, char *argv[]): dim(input_dim), alpha0(input_alpha), beta0(input_beta), data(input_data), theta(dim.L, dim.v), R(argc, argv) {
 
     // Generazione dei pesi pi e w
-    log_pi = draw_log_pi(alpha); // genera i pesi per DC dalla Dirichlet
-    log_W = draw_log_W(beta, dim.K);
+    vec log_pi(dim.K);
+    draw_log_pi(alpha0); // genera i pesi per DC dalla Dirichlet
+    mat log_W(dim.L, dim.K);
+    draw_log_W(beta0);
 
     // Generazione delle variabili categoriche S e M
-    S = draw_S(log_pi, dim.J);
-    M = draw_M(log_W, S, dim.N, dim.J, dim.max_N);
+    vec S;
+    draw_S();
+    mat M;
+    M.ones(dim.max_N, dim.J);
+    M=M*(-1);
+    draw_M();
 
     // Generazione dei parametri theta
-    theta = draw_theta(dim.L, dim.v);
+    Theta theta(dim.L,dim.v);
+    draw_theta();
 }
 
 void Chain::chain_step(void) {
     //UPDATE DISTRIBUTIONAL CLUSTERS
         // UPDATE PI (prima aggiorno i pesi e poi i nuovi valori di pi)
-        alpha = update_pi(alpha0, S, dim.K);
-        log_pi = draw_log_pi(alpha);
+        alpha = update_pi();
+        draw_log_pi(alpha);
 
-        S = update_S(S, log_pi, log_W, dim.K, M, dim.J, data.get_observationsFor());
+        S = update_S();
 
 
     // UPDATE OBSERVATIONAL CLUSTERS
         // UPDATE OMEGA (prima aggiorno i pesi poi i nuovi valori di omega)
-        beta = update_omega(beta, M, dim.L, dim.K, S);
-        log_W  = draw_log_W(beta, dim.K);
+        beta = update_omega();
+        draw_log_W(beta);
 
         // UPDATE M (prima aggiorno i pesi e poi i nuovi valori di M)
-        M = update_M(log_W, dim.L, dim.K, theta, data, S, M, dim.max_N, data.get_observationsFor());
+        update_M();
 
     // UPDATE PARAMETERS
         // UPDATE THETA (da chiamare su R)
-        theta = update_theta(theta); // PROVA CON NIW PER VEDERE SE FUNZIONA
+        update_theta(); // PROVA CON NIW PER VEDERE SE FUNZIONA
 
 
 }
@@ -55,9 +62,9 @@ void Chain::print(void) {
     theta.print();
 }
 
-vec Chain::draw_log_pi(vec& alpha) {
+void Chain::draw_log_pi(vec& alpha) {
     vec pi = generateDirichlet(alpha);
-    return arma::log(pi);
+    log_pi =  arma::log(pi);
 };
 
 // CONTROLLARE CHE NON RIUTILIZZI BETA PRECEDENTE MA SOLO IL PRIMO STESSA COS
@@ -65,74 +72,64 @@ vec Chain::draw_log_pi(vec& alpha) {
 
 // NORMALIZZARE?
 // CONTROLLARE JOIN-ROWS (COLS ?)
-mat Chain::draw_log_W(mat& beta, size_t& K) {
-    mat log_W;
-    for (int k = 0; k < K; k++) {
+void Chain::draw_log_W(mat beta) {
+    for (int k = 0; k < dim.K; k++) {
         vec log_w_k = arma::log(generateDirichlet(beta.col(k))); //genera un vettore dalla dirichlet per ogni k
-        log_W = arma::join_rows(log_W, log_w_k); // costruisce la matrice dei pesi aggiungendo ogni colonna
+        log_W.col(k) = log_w_k; // costruisce la matrice dei pesi aggiungendo ogni colonna
     }
-    return log_W;
 };
 
 
-vec Chain::draw_S(vec& log_pi, size_t& J) {
+void Chain::draw_S(void) {
     arma::vec pi = arma::exp(log_pi);
-    vec S;
-    S.set_size(J);
     std::default_random_engine generatore_random;
     discrete_distribution<int> Cat(pi.begin(), pi.end());
-    for (int j = 0; j < J; j++) {
+    for (int j = 0; j < dim.J; j++) {
         S(j) = Cat(generatore_random);
     }
     return S;
 };
 
-
-mat Chain::draw_M(mat& log_W, vec& S, size_t* N, size_t& J, size_t& max_N)  {
+void Chain::draw_M(void)  {
     mat w = arma::exp(log_W);
-    mat M;
-    M.ones(max_N, J);
-    M=M*(-1);
     std::default_random_engine generatore_random;
-    for (int j = 0; j < J; ++j) {
+    for (int j = 0; j < dim.J; ++j) {
         discrete_distribution<int> Cat_w(w.col(S(j)).begin(), w.col(S(j)).end());
-        for (int i = 0; i < *(N+j); i++) {
+        for (int i = 0; i < *(dim.N+j); i++) {
             M(i,j) = Cat_w(generatore_random); // genera M(matrice J x N) per ogni persona (j), genera N valori da categoriche seguendo la distribuzione Cat_w
         }
     }
-    return M;
 };
 
-Theta Chain::draw_theta(size_t& L, size_t& v) {
+void Chain::draw_theta(void) {
     // estrai da una NIW
-    Theta theta(L,v);
-
+    v = dim.v
     vec mean0(v, arma::fill::randu);  // Vettore delle medie con valori casuali
     mat cov0 = arma::eye<arma::mat>(v, v);  // Matrice di covarianza come matrice identità
     mat scale_mat = 0.1 * arma::eye<arma::mat>(v, v);  // Matrice di scala come 0.1 * matrice identità
     double df = 5.0;  // Gradi di libertà
 
-    for (size_t l = 0; l < L; ++l) {
+    for (size_t l = 0; l < dim.L; ++l) {
         vec mu = generateRandomVector(mean0, cov0); // DA DECIDERE I PARAMETRI DELLA PRIOR DELLA NIW
         mat cov = generateRandomMatrix(df, scale_mat);
         theta.set_mean(l, mu);
         theta.set_covariance(l,cov);
     }
-
-    return theta;
 };
 
-vec Chain::update_pi(vec& alpha, vec& S, size_t& K) {
-    for (int k = 0; k < K; ++k) {
-        alpha(k) = alpha(k) + arma::accu(S == k);
+vec Chain::update_pi(void) {
+    vec alpha(dim.K)
+    for (int k = 0; k < dim.K; ++k) {
+        alpha(k) = alpha0(k) + arma::accu(S == k);
     }
     return alpha;
 };
 
 
-mat Chain::update_omega(mat& beta, mat M, size_t& L, size_t& K, vec& S) {
-    for (int k = 0; k < K; ++k) {
-        for (int l = 0; l < L; ++l) {
+mat Chain::update_omega(void) {
+    mat beta(dim.L, dim.K)
+    for (int k = 0; k < dim.K; ++k) {
+        for (int l = 0; l < dim.L; ++l) {
             arma::mat Mk = M.cols(arma::find(S == k));
             beta(l,k) += arma::accu(Mk == l);
         }
@@ -140,10 +137,10 @@ mat Chain::update_omega(mat& beta, mat M, size_t& L, size_t& K, vec& S) {
     return beta;
 };
 
-
-vec Chain::update_S(vec& S, vec& log_pi, mat& log_W, size_t& K, mat& M, size_t& J, size_t* observations) { // guarda se funziona mettendo il log, senno integra via M
+void Chain::update_S(void) { // guarda se funziona mettendo il log, senno integra via M
     std::default_random_engine generatore_random;
-    for (int j = 0; j < J; ++j){
+    size_t* observations = data.get_observationsFor()
+    for (int j = 0; j < dim.J; ++j){
         vec log_P(K,arma::fill::zeros);
         for (int k = 0; k < K; ++k) {
             float log_Pk = log_pi(k);
@@ -157,7 +154,6 @@ vec Chain::update_S(vec& S, vec& log_pi, mat& log_W, size_t& K, mat& M, size_t& 
         discrete_distribution<int> Cat(pi.begin(), pi.end()); 
         S(j) = Cat(generatore_random);
     }
-    return S;
 };
 
 
@@ -170,13 +166,14 @@ double logLikelihood(const vec& x, const vec& mean, const mat& covariance) {
 }
 
 
-mat Chain::update_M(mat& log_W, size_t& L, size_t& K, Theta& theta, Data& data, vec& S, mat& M, size_t& N, size_t* observations) {
-    int J = data.getNumPeople();
+void Chain::update_M(void) {
+    int J = dim.J;
+    size_t* observations = data.get_observationsFor()
     for (int j = 0; j < J; ++j) {
         int k = S(j);
         for (int i = 0; i < *(observations + j); ++i) {
             vec log_Wk(L, arma::fill::zeros);
-            for (size_t l = 0; l < L; ++l) {
+            for (size_t l = 0; l < dim.L; ++l) {
                 log_Wk(l) = log_W(l,k);
             }
             for (int l = 0; l < L; ++l) {
@@ -195,7 +192,6 @@ mat Chain::update_M(mat& log_W, size_t& L, size_t& K, Theta& theta, Data& data, 
             M(i,j) = Cat(generatore_random);
         }
     }
-    return M;
 };
 
 
@@ -224,7 +220,7 @@ mat generateRandomMatrix(int degreesOfFreedom, const mat& scaleMatrix) {
     return randomMatrix;
 }
 
-Theta Chain::update_theta(Theta &theta)
+void Chain::update_theta(void)
 {
     
     using namespace Rcpp;
@@ -407,5 +403,4 @@ Theta Chain::update_theta(Theta &theta)
 
     // theta.print();
 
-    return theta;
 }
