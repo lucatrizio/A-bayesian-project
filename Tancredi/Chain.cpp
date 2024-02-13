@@ -3,13 +3,15 @@
 //
 #include <iostream>
 #include "Chain.hpp"
+/*
 #include <RInside.h>
 #include <Rcpp.h>
+*/
 #include <armadillo>
 
+/* R(argc, argv)  da mettere nel costruttore*/
 
-
-Chain::Chain(const Dimensions& input_dim, const vec& input_alpha, const mat& input_beta, Data& input_data, int argc, char *argv[]): dim(input_dim), alpha(input_alpha), beta(input_beta), data(input_data), theta(dim.L, dim.v), R(argc, argv), log_W(input_dim.L, input_dim.K), S(input_dim.J), M(input_dim.max_N, input_dim.J){
+Chain::Chain(const Dimensions& input_dim, const vec& input_alpha, const mat& input_beta, Data& input_data, vec& mu, double& lambda, int& nu, mat& scale_matrix, int argc, char *argv[]): dim(input_dim), alpha(input_alpha), beta(input_beta), data(input_data), theta(dim.L, dim.v), log_W(input_dim.L, input_dim.K), S(input_dim.J), M(input_dim.max_N, input_dim.J){
 
     // Generazione dei pesi pi e w
     draw_log_pi(alpha); // genera i pesi per DC dalla Dirichlet
@@ -19,9 +21,8 @@ Chain::Chain(const Dimensions& input_dim, const vec& input_alpha, const mat& inp
 
     M.fill(-1);
     draw_M();
-
     // Generazione dei parametri theta
-    draw_theta();
+    draw_theta(mu, lambda, nu, scale_matrix);
 }
 
 void Chain::chain_step(void) {
@@ -30,7 +31,6 @@ void Chain::chain_step(void) {
         vec alpha_post = update_pi();
         draw_log_pi(alpha_post);
         update_S();
-
 
     // UPDATE OBSERVATIONAL CLUSTERS
         // UPDATE OMEGA (prima aggiorno i pesi poi i nuovi valori di omega)
@@ -41,30 +41,32 @@ void Chain::chain_step(void) {
         update_M();
 
     // UPDATE PARAMETERS
-        update_theta(); // PROVA CON NIW PER VEDERE SE FUNZIONA
+        update_theta_NIW(); // PROVA CON NIW PER VEDERE SE FUNZIONA
+
 }
 
 void Chain::print(void) {
     cout << "pi:\n" << arma::normalise(arma::exp(log_pi),1) << endl;
     cout << "w:\n" << arma::normalise(arma::exp(log_W),1, 0) << endl;
-    cout << "S:\n" << S << endl;
     cout << "M:\n" << M << endl;
-    cout << "alpha:\n" << alpha << endl;
-    cout << "Beta:\n" << beta << endl;
-    // theta.print();
+    //cout << "alpha:\n" << alpha << endl;
+    //cout << "Beta:\n" << beta << endl;
+    cout << "S:\n" << S << endl;
+    cout << "Theta:\n" << endl;
+    theta.print();
 }
 
-void Chain::draw_log_pi(vec& alpha) {
-    vec pi = generateDirichlet(alpha);
+void Chain::draw_log_pi(vec& a) {
+    vec pi = generateDirichlet(a);
     log_pi =  arma::log(pi);
 };
 
 // CONTROLLARE CHE NON RIUTILIZZI BETA PRECEDENTE MA SOLO IL PRIMO STESSA COS
 
 
-void Chain::draw_log_W(mat& beta) {
+void Chain::draw_log_W(mat& B) {
     for (int k = 0; k < dim.K; k++) {
-        vec log_w_k = arma::log(generateDirichlet(beta.col(k))); //genera un vettore dalla dirichlet per ogni k
+        vec log_w_k = arma::log(generateDirichlet(B.col(k))); //genera un vettore dalla dirichlet per ogni k
         log_W.col(k) = log_w_k; // costruisce la matrice dei pesi aggiungendo ogni colonna
     }
 };
@@ -90,26 +92,23 @@ void Chain::draw_M(void)  {
     }
 };
 
-void Chain::draw_theta(void) {
-    // estrai da una NIW
-    size_t v = dim.v;
-    vec mean0(v, arma::fill::randu);  // Vettore delle medie con valori casuali
-    mat cov0 = arma::eye<arma::mat>(v, v);  // Matrice di covarianza come matrice identità
-    mat scale_mat = 0.1 * arma::eye<arma::mat>(v, v);  // Matrice di scala come 0.1 * matrice identità
-    double df = 5.0;  // Gradi di libertà
-
+void Chain::draw_theta(vec& mu, double& lambda, int& nu, mat& scale_matrix) {
     for (size_t l = 0; l < dim.L; ++l) {
-        vec mu = generateRandomVector(mean0, cov0); // DA DECIDERE I PARAMETRI DELLA PRIOR DELLA NIW
-        mat cov = generateRandomMatrix(df, scale_mat);
-        theta.set_mean(l, mu);
-        theta.set_covariance(l,cov);
+        mat covariance = generateRandomMatrix(nu, scale_matrix);
+        vec mean = generateRandomVector(mu, covariance * (1/lambda));
+        theta.set_mean(l, mean);
+        theta.set_covariance(l,covariance);
+        theta.set_mu(l,mu);
+        theta.set_lambda(l,lambda);
+        theta.set_nu(l,nu);
+        theta.set_scale_matrix(l, scale_matrix);
     }
 };
 
 vec Chain::update_pi(void) {
-    vec alpha_post(dim.K);
+    vec alpha_post = alpha;
     for (size_t k = 0; k < dim.K; ++k) {
-        alpha_post(k) = alpha(k) + arma::accu(S == k);
+        alpha_post(k) += arma::accu(S == k);
     }
     return alpha_post;
 };
@@ -118,8 +117,8 @@ vec Chain::update_pi(void) {
 mat Chain::update_omega(void) {
     mat beta_post = beta;
     for (size_t k = 0; k < dim.K; ++k) {
+        arma::mat Mk = M.cols(arma::find(S == k));
         for (size_t l = 0; l < dim.L; ++l) {
-            arma::mat Mk = M.cols(arma::find(S == k));
             beta_post(l,k) += arma::accu(Mk == l);
         }
     }
@@ -138,7 +137,7 @@ void Chain::update_S(void) { // guarda se funziona mettendo il log, senno integr
                 }
             log_P(k) = log_Pk;
         }
-        vec pi = arma::exp(log_P);
+        vec pi = arma::exp(log_P- arma::max(log_P)); // - arma::max(log_P)
         pi = arma::normalise(pi, 1);
         discrete_distribution<int> Cat(pi.begin(), pi.end()); 
         S(j) = Cat(generatore_random);
@@ -148,9 +147,11 @@ void Chain::update_S(void) { // guarda se funziona mettendo il log, senno integr
 
 double logLikelihood(const vec& x, const vec& mean, const mat& covariance) {
     int dim = x.size();
-    double expTerm = -0.5 * as_scalar(trans(x - mean) * arma::inv(covariance) * (x - mean));
-    double normalization = -0.5 * dim * log(2.0 * M_PI) - 0.5 * log(det(covariance));
-    double logLik = normalization + expTerm;
+    vec dif = x - mean;
+    vec prod = arma::inv(covariance) * dif;
+    double res = arma::dot(prod, dif);
+    double normalization = log(abs(det(covariance)));
+    double logLik = -(normalization + res);
     return logLik;
 }
 
@@ -164,11 +165,9 @@ void Chain::update_M(void) {
             vec log_Wk(dim.L, arma::fill::zeros);
             for (size_t l = 0; l < dim.L; ++l) {
                 log_Wk(l) = log_W(l,k);
-            }
-            for (size_t l = 0; l < dim.L; ++l) {
                 log_Wk(l) += logLikelihood(data.get_vec(j,i), theta.get_mean(l), theta.get_cov(l));
             }
-            vec Wk = arma::exp(log_Wk);
+            vec Wk = arma::exp(log_Wk- arma::max(log_Wk)); // - arma::max(log_Wk)
             Wk = arma::normalise(Wk, 1);
             std::default_random_engine generatore_random;
             discrete_distribution<int> Cat(Wk.begin(), Wk.end()); 
@@ -178,14 +177,14 @@ void Chain::update_M(void) {
 };
 
 
-vec generateDirichlet(const vec& alpha) {
+vec generateDirichlet(const vec& a) {
 
-    int k = alpha.n_elem;
+    int k = a.n_elem;
     vec gammaSample(k);
 
     // Genera k variabili casuali dalla distribuzione gamma
     for (int i = 0; i < k; ++i) {
-        gammaSample(i) = randg(1, distr_param(alpha(i), 1.0))(0);
+        gammaSample(i) = randg(1, distr_param(a(i), 1.0))(0);
     }
 
     // Normalizza il campione per ottenere una variabile casuale Dirichlet
@@ -194,7 +193,7 @@ vec generateDirichlet(const vec& alpha) {
 
 vec generateRandomVector(const vec& mean, const mat& covariance) {
     int dim = mean.size();
-    vec randomVector = mean + chol(covariance, "lower") * randn<vec>(dim);
+    vec randomVector = mean + chol(covariance, "lower") * arma::randn(dim);
     return randomVector;
 }
 
@@ -202,7 +201,7 @@ mat generateRandomMatrix(int degreesOfFreedom, const mat& scaleMatrix) {
     mat randomMatrix = iwishrnd(scaleMatrix, degreesOfFreedom);
     return randomMatrix;
 }
-
+/*
 void Chain::update_theta(void)
 {
     vec** data_per_cluster = {nullptr};
@@ -396,3 +395,70 @@ void Chain::update_theta(void)
     // theta.print();
 
 }
+*/
+
+void Chain::update_theta_NIW() {
+
+    vec n(dim.L, arma::fill::zeros);
+
+    for (size_t l = 0; l < dim.L; ++l) {
+        n(l) = arma::accu(M == l);
+    }
+
+    for (size_t l = 0; l < dim.L; ++l) {
+        if (n(l) != 0) {
+            uvec indeces = arma::find(M == l);
+            mat data_cluster_l(indeces.size(), theta.get_size_v());
+            for (size_t i = 0; i < indeces.size(); i++) {
+                data_cluster_l.row(i) = data.get_vec(indeces(i) / dim.max_N, indeces(i) % dim.max_N).t();
+            }
+            vec x_bar = arma::mean(data_cluster_l, 0).t();
+            mat x_bar_mat = arma::repmat(x_bar, 1, n(l));
+
+            // aggiorna i parametri della NIW
+            double lambda_post = theta.get_lambda(l) + n(l);
+            int nu_post = theta.get_nu(l) + n(l);
+
+            // covariance post 
+                // S
+                mat S = (data_cluster_l - x_bar_mat.t()).t() *(data_cluster_l - x_bar_mat.t());
+                // T
+                mat T = ((x_bar - theta.get_mu(l)) * (x_bar - theta.get_mu(l)).t()) * (theta.get_lambda(l) * n(l)) / lambda_post;
+
+            mat scale_matrix_post = theta.get_scale_matrix(l) + S + T;
+
+            vec mu_post = (theta.get_lambda(l) * theta.get_mu(l) + n(l) * x_bar) / (lambda_post);
+           
+
+            // UPDATE NIW
+            theta.set_covariance(l, generateRandomMatrix(nu_post, scale_matrix_post));
+            theta.set_mean(l, generateRandomVector(mu_post, theta.get_cov(l) / lambda_post));
+        }
+        else {
+            theta.set_covariance(l, generateRandomMatrix(theta.get_nu(l), theta.get_scale_matrix(l)));
+            theta.set_mean(l, generateRandomVector(theta.get_mu(l), theta.get_cov(l) / theta.get_lambda(l)));
+
+        }
+    }
+}
+
+
+
+// package salso in R
+
+/*
+      // new parameters
+      new_nu0 = nu0 + n_l ;
+      new_beta0 = beta0+n_l ;
+      new_m0 = (beta0 * m0 + n_l*ybar_l)/new_beta0;
+      new_iW0 = iW0 + S + n_l*beta0/(new_beta0) * (ybar_l-m0).t() * (ybar_l-m0) ;
+      out_W.slice(l) = rwish_cpp(arma::inv_sympd(new_iW0),new_nu0);
+      tout_mu.col(l) = rmvtnorm_cpp_precision( new_m0.t(), new_beta0 * out_W.slice(l) ) ;
+
+    } else {
+      // from prior
+      out_W.slice(l) = rwish_cpp(W0,nu0);
+      tout_mu.col(l) = rmvtnorm_cpp_precision( m0.t(), beta0 * out_W.slice(l) )  ;
+    }
+  }
+*/

@@ -6,9 +6,10 @@
 #define A_BAYESIAN_PROJECT_CHAIN_HPP
 #include "Theta.hpp"
 #include "Data.hpp"
+/*
 #include <RInside.h>
 #include <Rcpp.h>
-
+*/
 
 struct Dimensions{
     size_t J; //n of persons
@@ -27,17 +28,17 @@ private:
     Dimensions dim; //input
     vec alpha; // (K x 1) K:= numero di DC (passato in input)
     vec log_pi; // (K x 1) pesi per scegliere DC
-    mat beta; // (L x K) L := numero di OC (passato in input) x numero di DC
+    mat beta; // (L x 1) L := numero di OC (passato in input) x numero di DC
     mat log_W; // (L x K) scelto K, pesi per scegliere OC
     vec S; // (J x 1) assegna un DC ad ogni persona (J persone)
     mat M; // (max(n_j) x J) assegna per ogni persona un OC ad ogni atomo di quella persona (J persone e n_j atomo per persona j)
     Theta theta; // (L x 1) ogni elemento di Theta è uno degli atomi comuni a tutti i DC
-    RInside R;
+    // RInside R;
 
 public:
 
     // Costruttore
-    Chain(const Dimensions& input_dim, const vec& input_alpha, const mat& input_beta, Data& input_data, int argc = 1, char *argv[] = { nullptr });
+    Chain(const Dimensions& input_dim, const vec& input_alpha, const mat& input_beta, Data& input_data,vec& mu, double& lambda, int& nu, mat& scale_matrix, int argc = 1, char *argv[] = { nullptr });
 
     // Chain step
     void chain_step(void);
@@ -46,18 +47,19 @@ public:
     void print(void);
 
     //Draws
-    void draw_log_pi(vec& alpha);
-    void draw_log_W(mat& beta);
+    void draw_log_pi(vec& a);
+    void draw_log_W(mat& B);
     void draw_S(void);
     void draw_M(void);
-    void draw_theta(void);
+    void draw_theta(vec& mu, double& lambda, int& nu, mat& scale_matrix);
 
     //Updates
     vec update_pi(void);
     mat update_omega(void);
     void update_S(void);
     void update_M(void);
-    void update_theta(void); //da chiamare con R
+    // void update_theta(void); //da chiamare con R
+    void update_theta_NIW(void);
 
 };
 
@@ -65,7 +67,7 @@ public:
 double logLikelihood(const vec& x, const vec& mean, const mat& covariance);
 
 // funzione per generare campioni da una dirichlet di con parametro alpha (vettore)
-vec generateDirichlet(const vec& alpha);
+vec generateDirichlet(const vec& a);
 
 // Genera casualmente un vettore da una distribuzione normale multivariata
 vec generateRandomVector(const vec& mean, const mat& covariance);

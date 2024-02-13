@@ -3,25 +3,23 @@ library(openxlsx)
 set.seed(2024)
 
 
-J = 15
+J = 10
 q = 3
-K = 5
-L = 4
+K = 2
+L = 3
 
-w <- matrix(c(0.25, 0.25, 0.25, 0.25,
-              1/3, 1/3, 1/3, 0,
-              0, 1/3, 1/3, 1/3,
-              0, 0.5, 0.5, 0,
-              0, 0.5, 0.5, 0), nrow = 5, byrow=T)
+w <- matrix(c(0.5, 0.5, 0
+                0, 0.5 0.5), nrow = 5, byrow=T)
 cat_w <- 1:L 
 
-pi <- c(0.2, 0.2, 0.2, 0.2, 0.2)
+pi <- c(0.5, 0.5)
 cat_pi <- 1:K
 
 nj <- c(3:5, 3:5, 3:5, 3:5, 3:5)
 
 mu1 <- numeric(3)
 mu2 <- c(9:11)
+mu3 <- -c(9:11)
 
 sigma1 <- diag(1, nrow = q, ncol = q)
 sigma2 <- matrix(c(16, 4, 4, 4, 9, 2, 4, 2, 9), nrow = 3, byrow = TRUE)

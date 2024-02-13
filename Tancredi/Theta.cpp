@@ -24,13 +24,29 @@ void Theta::print(){
         theta[l].mean.print();
         std::cout << "covariance" << l <<  std::endl;
         theta[l].covariance.print();
-        std::cout << "DAG" << l <<  std::endl;
-        theta[l].DAG.print();
+        //std::cout << "DAG" << l <<  std::endl;
+        //theta[l].DAG.print();
     }
 }
 
 void Theta::set_mean(size_t l, const vec& mu) {
     theta[l].mean = mu;
+}
+
+void Theta::set_mu(size_t l, const vec& mu) {
+    theta[l].mu = mu;
+}
+
+void Theta::set_lambda(size_t l, const double& lambda) {
+    theta[l].lambda = lambda;
+}
+
+void Theta::set_nu(size_t l, const int& nu) {
+    theta[l].nu = nu;
+}
+
+void Theta::set_scale_matrix(size_t l, const mat& scale_matrix) {
+    theta[l].scale_matrix = scale_matrix;
 }
 
 void Theta::set_m(size_t l, size_t s, double n) {
@@ -65,8 +81,24 @@ arma::vec Theta::get_mean(size_t i){
     return theta[i].mean;
 }
 
+arma::vec Theta::get_mu(size_t i){
+    return theta[i].mu;
+}
+
+double Theta::get_lambda(size_t i){
+    return theta[i].lambda;
+}
+
 arma::mat Theta::get_cov(size_t i){
     return theta[i].covariance;
+}
+
+int Theta::get_nu(size_t i){
+    return theta[i].nu;
+}
+
+arma::mat Theta::get_scale_matrix(size_t i){
+    return theta[i].scale_matrix;
 }
 
 arma::mat Theta::get_DAG(size_t i){
